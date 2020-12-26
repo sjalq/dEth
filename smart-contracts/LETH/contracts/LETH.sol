@@ -4,7 +4,8 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Mintable.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Burnable.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
-import "./DefiSaver.sol";
+import "./SaverProxy.sol";
+import "./SaverProxyActions.sol";
 
 contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
 {
@@ -16,19 +17,25 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
 
     address payable public gulper;
     MCDSaverProxy public saverProxy;
-    bytes32 public vaultId;
+    SaverProxyActions public saverProxyActions;
+    DSProxy public cdpDSProxy;
+    uint public cdpId;
 
     constructor(
             address payable _gulper,
             MCDSaverProxy _saverProxy,
-            bytes32 _vaultId)
+            SaverProxyActions _saverProxyActions,
+            DSProxy _cdpDSProxy,
+            uint _cdpId)
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
     { 
         _removeMinter(msg.sender);
         gulper = _gulper;
         saverProxy = _saverProxy;
-        vaultId = _vaultId;
+        saverProxyActions = _saverProxyActions;
+        cdpDSProxy = _cdpDSProxy;
+        cdpId = _cdpId;
     }
 
     function issue(address _receiver)
@@ -47,12 +54,23 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         // *send fee to the gulper contract
         // *give the minter a  proportion of the LETH such that it represents their value add to the vault
 
-        uint ethValue = vault.collateral().sub(vault.debt().div(vault.price()));
-        uint proportion = msg.value.mul(HUNDRED_PERC).div(ethValue);
+        (uint collateral, uint debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
+        uint maxCollateral = saverProxy.getMaxCollateral();
+        
+        // improve these...?
+        uint proportion = msg.value.mul(HUNDRED_PERC).div(maxCollateral);
         uint LETHToIssue = totalSupply().mul(proportion).div(HUNDRED_PERC);
-        uint fee = msg.value.div(HUNDRED_PERC).mul(FEE_PERC);
-        vault.deposit()((msg.value.sub(fee));
-        gulper.deposit()(fee);
+        uint fee = msg.value.mul(FEE_PERC).div(HUNDRED_PERC);
+        uint ETHToLock = msg.value.sub(fee);
+
+        bytes memory proxyCall = abi.encodeWithSignature(
+            "lockETH(address,address,uint256)", 
+            saverProxy.MANAGER_ADDRESS, 
+            0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
+            ETHToLock);
+        cdpDSProxy.execute(address(saverProxyActions), proxyCall);
+
+        gulper.call(fee)();
         mint(_receiver, LETHToMind);
     }
 
