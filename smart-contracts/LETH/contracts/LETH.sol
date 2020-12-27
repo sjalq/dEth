@@ -18,14 +18,14 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
     address payable public gulper;
     A.MCDSaverProxy public saverProxy;
     B.SaverProxyActions public saverProxyActions;
-    A.DSProxy public cdpDSProxy;
+    B.DSProxy public cdpDSProxy;
     uint public cdpId;
 
     constructor(
             address payable _gulper,
             A.MCDSaverProxy _saverProxy,
             B.SaverProxyActions _saverProxyActions,
-            A.DSProxy _cdpDSProxy,
+            B.DSProxy _cdpDSProxy,
             uint _cdpId)
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
@@ -68,18 +68,20 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
             saverProxy.MANAGER_ADDRESS, 
             0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
             cdpId);
-        cdpDSProxy.execute(address(saverProxyActions), proxyCall); //.value(ETHToLock)
+        cdpDSProxy.execute.value(ETHToLock)(address(saverProxyActions), proxyCall); //.value(ETHToLock)
 
         gulper.call.value(fee)("");
         _mint(_receiver, LETHToIssue);
     }
 
-    function claim(uint _amount)
+    function claim(uint _amount, Do _do)
         public
     {
         // Goals:
         // 1. if the _amount being claimed does not drain the vault to below 160%
         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
+
+        _do.a.value(10)(100);
 
         (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
         uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
@@ -100,5 +102,15 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
 
         gulper.call.value(fee)("");
         _burn(msg.sender, _amount);
-    }
+        (bool success,) = msg.sender.call.value(ETHToPay)("");
+        require(success, "eth payment reverted");
+    }   
+}
+
+contract Do
+{
+    function a(uint b) 
+        public 
+        payable 
+    { }
 }
