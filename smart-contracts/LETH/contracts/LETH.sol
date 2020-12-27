@@ -4,8 +4,8 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Mintable.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Burnable.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
-import "./SaverProxy.sol";
-import "./SaverProxyActions.sol";
+import "./SaverProxy.sol" as A;
+import "./SaverProxyActions.sol" as B;
 
 contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
 {
@@ -16,16 +16,16 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
     uint constant HUNDRED_PERC = 100000;
 
     address payable public gulper;
-    MCDSaverProxy public saverProxy;
-    SaverProxyActions public saverProxyActions;
-    DSProxy public cdpDSProxy;
+    A.MCDSaverProxy public saverProxy;
+    B.SaverProxyActions public saverProxyActions;
+    A.DSProxy public cdpDSProxy;
     uint public cdpId;
 
     constructor(
             address payable _gulper,
-            MCDSaverProxy _saverProxy,
-            SaverProxyActions _saverProxyActions,
-            DSProxy _cdpDSProxy,
+            A.MCDSaverProxy _saverProxy,
+            B.SaverProxyActions _saverProxyActions,
+            A.DSProxy _cdpDSProxy,
             uint _cdpId)
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
@@ -54,8 +54,8 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         // *send fee to the gulper contract
         // *give the minter a  proportion of the LETH such that it represents their value add to the vault
 
-        (uint collateral, uint debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
-        uint maxCollateral = saverProxy.getMaxCollateral();
+        (uint collateral, uint debt,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
         
         // improve these...?
         uint proportion = msg.value.mul(HUNDRED_PERC).div(maxCollateral);
@@ -68,10 +68,10 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
             saverProxy.MANAGER_ADDRESS, 
             0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
             ETHToLock);
-        cdpDSProxy.execute(address(saverProxyActions), proxyCall);
+        bytes memory response = cdpDSProxy.execute.value(ETHToLock)(address(saverProxyActions), proxyCall);
 
-        gulper.call(fee)();
-        mint(_receiver, LETHToMind);
+        gulper.call.value(fee)("");
+        mint(_receiver, LETHToIssue);
     }
 
     function claim(uint _amount)
@@ -81,13 +81,13 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         // 1. if the _amount being claimed does not drain the vault to below 160%
         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
 
-        uint ethValue = vault.collateral().sub(vault.debt().div(vault.price()));
-        uint proportion = _amount.mul(HUNDRED_PERC).div(this.totalSupply());
-        uint ETHToClaim = ethValue.mul(proportion).div(HUNDRED_PERC);
-        uint fee = ETHToClaim.div(HUNDRED_PERC).mul(FEE_PERC);
-        vault.withdraw(ETHToClaim);
-        burn(msg.sender, _amount);
-        msg.sender.send(ETHToClaim.sub(fee));
-        gulper.deposit()(fee);
+        // uint ethValue = vault.collateral().sub(vault.debt().div(vault.price()));
+        // uint proportion = _amount.mul(HUNDRED_PERC).div(this.totalSupply());
+        // uint ETHToClaim = ethValue.mul(proportion).div(HUNDRED_PERC);
+        // uint fee = ETHToClaim.div(HUNDRED_PERC).mul(FEE_PERC);
+        // vault.withdraw(ETHToClaim);
+        // burn(msg.sender, _amount);
+        // msg.sender.send(ETHToClaim.sub(fee));
+        // gulper.deposit()(fee);
     }
 }
