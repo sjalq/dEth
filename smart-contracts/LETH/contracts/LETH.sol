@@ -54,7 +54,7 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         // *send fee to the gulper contract
         // *give the minter a  proportion of the LETH such that it represents their value add to the vault
 
-        (uint collateral, uint debt,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
         uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
         
         // improve these...?
@@ -67,11 +67,11 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
             "lockETH(address,address,uint256)", 
             saverProxy.MANAGER_ADDRESS, 
             0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
-            ETHToLock);
-        bytes memory response = cdpDSProxy.execute.value(ETHToLock)(address(saverProxyActions), proxyCall);
+            cdpId);
+        cdpDSProxy.execute(address(saverProxyActions), proxyCall); //.value(ETHToLock)
 
         gulper.call.value(fee)("");
-        mint(_receiver, LETHToIssue);
+        _mint(_receiver, LETHToIssue);
     }
 
     function claim(uint _amount)
@@ -81,13 +81,24 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         // 1. if the _amount being claimed does not drain the vault to below 160%
         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
 
-        // uint ethValue = vault.collateral().sub(vault.debt().div(vault.price()));
-        // uint proportion = _amount.mul(HUNDRED_PERC).div(this.totalSupply());
-        // uint ETHToClaim = ethValue.mul(proportion).div(HUNDRED_PERC);
-        // uint fee = ETHToClaim.div(HUNDRED_PERC).mul(FEE_PERC);
-        // vault.withdraw(ETHToClaim);
-        // burn(msg.sender, _amount);
-        // msg.sender.send(ETHToClaim.sub(fee));
-        // gulper.deposit()(fee);
+        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
+        
+        // improve these...?
+        uint proportion = _amount.mul(HUNDRED_PERC).div(totalSupply());
+        uint ETHToFree = maxCollateral.mul(proportion).div(HUNDRED_PERC);
+        uint fee = ETHToFree.mul(FEE_PERC).div(HUNDRED_PERC);
+        uint ETHToPay = ETHToFree.sub(fee);
+
+        bytes memory proxyCall = abi.encodeWithSignature(
+            "freeETH(address,address,uint256,uint256)",
+            saverProxy.MANAGER_ADDRESS,
+            0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
+            cdpId,
+            ETHToFree);
+        cdpDSProxy.execute(address(saverProxyActions), proxyCall);
+
+        gulper.call.value(fee)("");
+        _burn(msg.sender, _amount);
     }
 }
