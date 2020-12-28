@@ -123,7 +123,7 @@ contract LETH is Context, ERC20Detailed, ERC20
         (bool feePaymentSuccess,) = gulper.call.value(fee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
         _burn(msg.sender, _amount);
-        (bool success,) = msg.sender.call.value(ETHToPay)("");
-        require(success, "eth payment reverted");
+        (bool payoutSuccess,) = msg.sender.call.value(ETHToPay)("");
+        require(payoutSuccess, "eth payment reverted");
     }   
 }
