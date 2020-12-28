@@ -3,38 +3,52 @@ pragma solidity ^0.5.17;
 import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
-import "./SaverProxy.sol" as A;
-import "./SaverProxyActions.sol" as B;
+
+contract IDSProxy
+{
+    function execute(address _target, bytes memory _data) public payable returns (bytes32);
+}
+
+contract IMCDSaverProxy
+{
+    function getCdpDetailedInfo(uint _cdpId) public view returns (uint collateral, uint debt, uint price, bytes32 ilk);
+    function getMaxCollateral(uint _cdpId, bytes32 _ilk) public view returns (uint);
+
+    // copied from ConstantAddressesMainnet
+    address public constant MANAGER_ADDRESS = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+}
 
 contract LETH is Context, ERC20Detailed, ERC20
 {
     using SafeMath for uint;
 
-    uint constant FEE_PERC = 900;
-    uint constant ONE_PERC = 1000;
-    uint constant HUNDRED_PERC = 100000;
+    uint constant FEE_PERC = 9**6;
+    uint constant ONE_PERC = 10**7;
+    uint constant HUNDRED_PERC = 10**9;
 
     address payable public gulper;
-    A.MCDSaverProxy public saverProxy;
-    B.SaverProxyActions public saverProxyActions;
-    B.DSProxy public cdpDSProxy;
+    IMCDSaverProxy public saverProxy;
+    address public saverProxyActions;
+    IDSProxy public cdpDSProxy;
     uint public cdpId;
 
     constructor(
             address payable _gulper,
-            A.MCDSaverProxy _saverProxy,
-            B.SaverProxyActions _saverProxyActions,
-            B.DSProxy _cdpDSProxy,
-            uint _cdpId)
+            IMCDSaverProxy _saverProxy,
+            address _saverProxyActions,
+            IDSProxy _cdpDSProxy,
+            uint _cdpId,
+            address _initialRecipient,
+            uint _initialSupply)
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
     { 
-        // _removeMinter(msg.sender);
         gulper = _gulper;
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
         cdpDSProxy = _cdpDSProxy;
         cdpId = _cdpId;
+        _mint(_initialRecipient, _initialSupply);
     }
 
     function calculateIssuanceAmount(uint _collateralAmount)
@@ -78,7 +92,7 @@ contract LETH is Context, ERC20Detailed, ERC20
             saverProxy.MANAGER_ADDRESS, 
             0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
             cdpId);
-        cdpDSProxy.execute.value(ETHToLock)(address(saverProxyActions), proxyCall);
+        cdpDSProxy.execute.value(ETHToLock)(saverProxyActions, proxyCall);
 
         (bool feePaymentSuccess,) = gulper.call.value(fee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
@@ -118,7 +132,7 @@ contract LETH is Context, ERC20Detailed, ERC20
             0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
             cdpId,
             ETHToFree);
-        cdpDSProxy.execute(address(saverProxyActions), proxyCall);
+        cdpDSProxy.execute(saverProxyActions, proxyCall);
 
         (bool feePaymentSuccess,) = gulper.call.value(fee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
