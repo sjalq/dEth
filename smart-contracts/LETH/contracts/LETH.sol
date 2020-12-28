@@ -1,13 +1,12 @@
 pragma solidity ^0.5.17;
 
+import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
-import "../../common.5/openzeppelin/token/ERC20/ERC20Mintable.sol";
-import "../../common.5/openzeppelin/token/ERC20/ERC20Burnable.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./SaverProxy.sol" as A;
 import "./SaverProxyActions.sol" as B;
 
-contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
+contract LETH is Context, ERC20Detailed, ERC20
 {
     using SafeMath for uint;
 
@@ -30,12 +29,30 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
     { 
-        _removeMinter(msg.sender);
+        // _removeMinter(msg.sender);
         gulper = _gulper;
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
         cdpDSProxy = _cdpDSProxy;
         cdpId = _cdpId;
+    }
+
+    function calculateIssuanceAmount(uint _collateralAmount)
+        public
+        view
+        returns (
+            uint _actualCollateralAdded,
+            uint _fee,
+            uint _tokensIssued)
+    {
+        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
+        
+        // improve these by using r and w math functions
+        _fee = _collateralAmount.mul(FEE_PERC).div(HUNDRED_PERC);
+        _actualCollateralAdded = _collateralAmount.sub(_fee);
+        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(maxCollateral);
+        _tokensIssued = totalSupply().mul(proportion).div(HUNDRED_PERC);
     }
 
     function issue(address _receiver)
@@ -54,43 +71,46 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
         // *send fee to the gulper contract
         // *give the minter a  proportion of the LETH such that it represents their value add to the vault
 
-        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
-        
-        // improve these...?
-        uint proportion = msg.value.mul(HUNDRED_PERC).div(maxCollateral);
-        uint LETHToIssue = totalSupply().mul(proportion).div(HUNDRED_PERC);
-        uint fee = msg.value.mul(FEE_PERC).div(HUNDRED_PERC);
-        uint ETHToLock = msg.value.sub(fee);
+        (uint ETHToLock, uint fee, uint LETHToIssue)  = calculateIssuanceAmount(msg.value);
 
         bytes memory proxyCall = abi.encodeWithSignature(
             "lockETH(address,address,uint256)", 
             saverProxy.MANAGER_ADDRESS, 
             0xF8094e15c897518B5Ac5287d7070cA5850eFc6ff, 
             cdpId);
-        cdpDSProxy.execute.value(ETHToLock)(address(saverProxyActions), proxyCall); //.value(ETHToLock)
+        cdpDSProxy.execute.value(ETHToLock)(address(saverProxyActions), proxyCall);
 
-        gulper.call.value(fee)("");
+        (bool feePaymentSuccess,) = gulper.call.value(fee)("");
+        require(feePaymentSuccess, "fee transfer to gulper failed");
         _mint(_receiver, LETHToIssue);
     }
 
-    function claim(uint _amount, Do _do)
+    function calculateRedemptionValue(uint _tokenAmount)
+        public
+        view
+        returns (
+            uint _totalValue, 
+            uint _fee, 
+            uint _finalValue)
+    {
+        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
+        
+        // improve these by using r and w math functions
+        uint proportion = _tokenAmount.mul(HUNDRED_PERC).div(totalSupply());
+        _totalValue = maxCollateral.mul(proportion).div(HUNDRED_PERC);
+        _fee = _totalValue.mul(FEE_PERC).div(HUNDRED_PERC);
+        _finalValue = _totalValue.sub(_fee);
+    }
+
+    function claim(uint _amount)
         public
     {
         // Goals:
         // 1. if the _amount being claimed does not drain the vault to below 160%
         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
 
-        _do.a.value(10)(100);
-
-        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
-        
-        // improve these...?
-        uint proportion = _amount.mul(HUNDRED_PERC).div(totalSupply());
-        uint ETHToFree = maxCollateral.mul(proportion).div(HUNDRED_PERC);
-        uint fee = ETHToFree.mul(FEE_PERC).div(HUNDRED_PERC);
-        uint ETHToPay = ETHToFree.sub(fee);
+        (uint ETHToFree, uint fee, uint ETHToPay) = calculateRedemptionValue(_amount);
 
         bytes memory proxyCall = abi.encodeWithSignature(
             "freeETH(address,address,uint256,uint256)",
@@ -100,17 +120,10 @@ contract LETH is Context, ERC20Detailed, ERC20Mintable, ERC20Burnable
             ETHToFree);
         cdpDSProxy.execute(address(saverProxyActions), proxyCall);
 
-        gulper.call.value(fee)("");
+        (bool feePaymentSuccess,) = gulper.call.value(fee)("");
+        require(feePaymentSuccess, "fee transfer to gulper failed");
         _burn(msg.sender, _amount);
         (bool success,) = msg.sender.call.value(ETHToPay)("");
         require(success, "eth payment reverted");
     }   
-}
-
-contract Do
-{
-    function a(uint b) 
-        public 
-        payable 
-    { }
 }
