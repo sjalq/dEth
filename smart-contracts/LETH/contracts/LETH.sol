@@ -16,18 +16,6 @@ contract IMCDSaverProxy
     function getMaxCollateral(uint _cdpId, bytes32 _ilk) public view returns (uint);
 }
 
-contract KovanContracts
-{
-    address public MANAGER_ADDRESS = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
-    address public ETH_GEM_JOIN = 0xd19a770f00f89e6dd1f12e6d6e6839b95c084d85;
-}
-
-contract MainnetContracts
-{
-    address public MANAGER_ADDRESS = 0x1476483dd8c35f25e568113c5f70249d3976ba21;
-    address public ETH_GEM_JOIN = 0x08638ef1a205be6762a8b935f5da9b700cf7322c;
-}
-
 contract Ownable
 {
     address owner; 
@@ -61,8 +49,7 @@ contract LETH is
     Context, 
     ERC20Detailed, 
     ERC20, 
-    Ownable,
-    KovanContracts
+    Ownable
 {
     using SafeMath for uint;
 
@@ -71,30 +58,40 @@ contract LETH is
     uint constant HUNDRED_PERC = 10**9;
 
     address payable public gulper;
-    IMCDSaverProxy public saverProxy;
-    address public saverProxyActions;
     IDSProxy public cdpDSProxy;
     uint public cdpId;
-
+    
+    address public makerManager;
+    address public ethGemJoin;
+    IMCDSaverProxy public saverProxy;
+    address public saverProxyActions;
+    
     constructor(
             address _owner,
             address payable _gulper,
-            IMCDSaverProxy _saverProxy,
-            address _saverProxyActions,
             IDSProxy _cdpDSProxy,
             uint _cdpId,
-            address _initialRecipient,
-            uint _initialSupply)
+
+            address _makerManager,
+            address _ethGemJoin,
+            IMCDSaverProxy _saverProxy,
+            address _saverProxyActions,
+            
+            address _initialRecipient)
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
         Ownable(_owner)
     { 
         gulper = _gulper;
-        saverProxy = _saverProxy;
-        saverProxyActions = _saverProxyActions;
         cdpDSProxy = _cdpDSProxy;
         cdpId = _cdpId;
-        _mint(_initialRecipient, _initialSupply);
+
+        makerManager = _makerManager;
+        ethGemJoin = _ethGemJoin;
+        saverProxy = _saverProxy;
+        saverProxyActions = _saverProxyActions;
+        
+        _mint(_initialRecipient, getMaxCollateral());
     }
 
     function changeDSProxyOwner(address _newDSProxyOwner)
@@ -111,6 +108,15 @@ contract LETH is
         gulper = _newGulper;
     }
 
+    function getMaxCollateral()
+        public
+        view
+        returns(uint _maxCollateral)
+    {
+        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+        _maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
+    }
+
     function calculateIssuanceAmount(uint _collateralAmount)
         public
         view
@@ -119,13 +125,10 @@ contract LETH is
             uint _fee,
             uint _tokensIssued)
     {
-        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
-        
         // improve these by using r and w math functions
         _fee = _collateralAmount.mul(FEE_PERC).div(HUNDRED_PERC);
         _actualCollateralAdded = _collateralAmount.sub(_fee);
-        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(maxCollateral);
+        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getMaxCollateral());
         _tokensIssued = totalSupply().mul(proportion).div(HUNDRED_PERC);
     }
 
@@ -148,8 +151,8 @@ contract LETH is
 
         bytes memory proxyCall = abi.encodeWithSignature(
             "lockETH(address,address,uint256)", 
-            MANAGER_ADDRESS, 
-            ETH_GEM_JOIN, 
+            makerManager, 
+            ethGemJoin, 
             cdpId);
         cdpDSProxy.execute.value(collateralToLock)(saverProxyActions, proxyCall);
 
@@ -173,12 +176,9 @@ contract LETH is
             uint _fee, 
             uint _finalValue)
     {
-        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        uint maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
-        
         // improve these by using r and w math functions
         uint proportion = _tokenAmount.mul(HUNDRED_PERC).div(totalSupply());
-        _totalValue = maxCollateral.mul(proportion).div(HUNDRED_PERC);
+        _totalValue = getMaxCollateral().mul(proportion).div(HUNDRED_PERC);
         _fee = _totalValue.mul(FEE_PERC).div(HUNDRED_PERC);
         _finalValue = _totalValue.sub(_fee);
     }
@@ -201,8 +201,8 @@ contract LETH is
 
         bytes memory proxyCall = abi.encodeWithSignature(
             "freeETH(address,address,uint256,uint256)",
-            MANAGER_ADDRESS,
-            ETH_GEM_JOIN, 
+            makerManager, 
+            ethGemJoin, 
             cdpId,
             collateralToUnlock);
         cdpDSProxy.execute(saverProxyActions, proxyCall);
@@ -220,4 +220,16 @@ contract LETH is
             collateralToUnlock,
             collateralToReturn);
     }
+}
+
+contract KovanContracts
+{
+    address public MANAGER_ADDRESS = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+    address public ETH_GEM_JOIN = 0xd19A770F00F89e6Dd1F12E6D6E6839b95C084D85;
+}
+
+contract MainnetContracts
+{
+    address public MANAGER_ADDRESS = 0x1476483dD8C35F25e568113C5f70249D3976ba21;
+    address public ETH_GEM_JOIN = 0x08638eF1A205bE6762A8b935F5da9b700Cf7322c;
 }
