@@ -81,7 +81,8 @@ contract LETH is
         public
         ERC20Detailed("Levered Ether", "LETH", 18)
         Ownable(_owner)
-    { 
+    {
+        owner = _owner;
         gulper = _gulper;
         cdpDSProxy = _cdpDSProxy;
         cdpId = _cdpId;
@@ -224,12 +225,12 @@ contract LETH is
 
 contract KovanContracts
 {
-    address public MANAGER_ADDRESS = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
-    address public ETH_GEM_JOIN = 0xd19A770F00F89e6Dd1F12E6D6E6839b95C084D85;
+    address public constant MANAGER_ADDRESS = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+    address public constant ETH_GEM_JOIN = 0xd19A770F00F89e6Dd1F12E6D6E6839b95C084D85;
 }
 
 contract MainnetContracts
 {
-    address public MANAGER_ADDRESS = 0x1476483dD8C35F25e568113C5f70249D3976ba21;
-    address public ETH_GEM_JOIN = 0x08638eF1A205bE6762A8b935F5da9b700Cf7322c;
+    address public constant MANAGER_ADDRESS = 0x1476483dD8C35F25e568113C5f70249D3976ba21;
+    address public constant ETH_GEM_JOIN = 0x08638eF1A205bE6762A8b935F5da9b700Cf7322c;
 }

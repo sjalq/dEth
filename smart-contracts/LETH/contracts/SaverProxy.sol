@@ -319,7 +319,8 @@ contract ConstantAddressesExchangeKovan {
     address public constant NEW_IDAI_ADDRESS = 0x6c1E2B0f67e00c06c8e2BE7Dc681Ab785163fF4D;
 }
 
-contract ConstantAddressesExchange is ConstantAddressesExchangeMainnet {}
+//contract ConstantAddressesExchange is ConstantAddressesExchangeMainnet {}
+contract ConstantAddressesExchange is ConstantAddressesExchangeKovan {}
 
 contract ExchangeHelper is ConstantAddressesExchange {
 
