@@ -55,10 +55,10 @@ contract LETH is
 {
     using SafeMath for uint;
 
-    uint constant FEE_PERC = 9*10**6;
-    uint constant ONE_PERC = 10**7;
-    uint constant HUNDRED_PERC = 10**9;
-    uint constant MIN_RATION = 140;
+    uint constant FEE_PERC = 9*10**15;      //   0.9%
+    uint constant ONE_PERC = 10**16;        //   1.0% 
+    uint constant HUNDRED_PERC = 10**18;    // 100.0%
+    uint constant MIN_RATIO = 140;
 
     address payable public gulper;
     IDSProxy public cdpDSProxy;
@@ -144,7 +144,7 @@ contract LETH is
         pure
         returns(uint _minRatio)
     {
-        _minRatio = DSMath.rdiv(MIN_RATION.mul(10**9), 100);
+        _minRatio = DSMath.rdiv(MIN_RATIO.mul(10**9), 100);
     }
 
     function calculateIssuanceAmount(uint _collateralAmount)
@@ -155,7 +155,6 @@ contract LETH is
             uint _fee,
             uint _tokensIssued)
     {
-        // improve these by using r and w math functions
         _fee = _collateralAmount.mul(FEE_PERC).div(HUNDRED_PERC);
         _actualCollateralAdded = _collateralAmount.sub(_fee);
         uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getPositiveCollateral());
@@ -206,7 +205,7 @@ contract LETH is
             uint _fee, 
             uint _finalValue)
     {
-        // improve these by using r and w math functions
+        require(_tokenAmount <= totalSupply(), "_tokenAmount exceeds totalSupply()");
         uint proportion = _tokenAmount.mul(HUNDRED_PERC).div(totalSupply());
         _totalValue = getPositiveCollateral().mul(proportion).div(HUNDRED_PERC);
         _fee = _totalValue.mul(FEE_PERC).div(HUNDRED_PERC);
