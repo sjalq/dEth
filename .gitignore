@@ -1,5 +1,2 @@
 smart-contracts/LETH/build/
-smart-contracts/common.5/openzeppelin/token/ERC20/artifacts/
-smart-contracts/LETH/contracts/artifacts/
-*/artifacts/
-
+artifacts/

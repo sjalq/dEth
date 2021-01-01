@@ -3,6 +3,7 @@ pragma solidity ^0.5.17;
 import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
+import "./DSMath.sol";
 
 contract IDSProxy
 {
@@ -13,7 +14,7 @@ contract IDSProxy
 contract IMCDSaverProxy
 {
     function getCdpDetailedInfo(uint _cdpId) public view returns (uint collateral, uint debt, uint price, bytes32 ilk);
-    function getMaxCollateral(uint _cdpId, bytes32 _ilk) public view returns (uint);
+    function getRatio(uint _cdpId, bytes32 _ilk) public view returns (uint);
 }
 
 contract Ownable
@@ -48,14 +49,16 @@ contract Ownable
 contract LETH is 
     Context, 
     ERC20Detailed, 
-    ERC20, 
+    ERC20,
+    DSMath,
     Ownable
 {
     using SafeMath for uint;
 
-    uint constant FEE_PERC = 9**6;
+    uint constant FEE_PERC = 9*10**6;
     uint constant ONE_PERC = 10**7;
     uint constant HUNDRED_PERC = 10**9;
+    uint constant MIN_RATION = 140;
 
     address payable public gulper;
     IDSProxy public cdpDSProxy;
@@ -92,7 +95,7 @@ contract LETH is
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
         
-        _mint(_initialRecipient, getMaxCollateral());
+        _mint(_initialRecipient, getPositiveCollateral());
     }
 
     function changeDSProxyOwner(address _newDSProxyOwner)
@@ -109,13 +112,39 @@ contract LETH is
         gulper = _newGulper;
     }
 
-    function getMaxCollateral()
+    function getCollateral()
         public
         view
-        returns(uint _maxCollateral)
+        returns(uint _price, uint _totalCollateral, uint _debt, uint _debtCollateralDenominated, uint _positiveCollateral)
+    {
+        (_totalCollateral, _debt, _price,) = saverProxy.getCdpDetailedInfo(cdpId);
+        _debtCollateralDenominated = rdiv(_debt, _price);
+        _positiveCollateral = sub(_totalCollateral, _debtCollateralDenominated);
+    }
+
+    function getPositiveCollateral()
+        public
+        view
+        returns(uint _positiveCollateral)
+    {
+        (,,,, _positiveCollateral) = getCollateral();
+    }
+
+    function getRatio()
+        public
+        view
+        returns(uint _ratio)
     {
         (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        _maxCollateral = saverProxy.getMaxCollateral(cdpId, ilk);
+        _ratio = saverProxy.getRatio(cdpId, ilk);
+    }
+
+    function getMinRatio()
+        public
+        pure
+        returns(uint _minRatio)
+    {
+        _minRatio = DSMath.rdiv(MIN_RATION.mul(10**9), 100);
     }
 
     function calculateIssuanceAmount(uint _collateralAmount)
@@ -129,7 +158,7 @@ contract LETH is
         // improve these by using r and w math functions
         _fee = _collateralAmount.mul(FEE_PERC).div(HUNDRED_PERC);
         _actualCollateralAdded = _collateralAmount.sub(_fee);
-        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getMaxCollateral());
+        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getPositiveCollateral());
         _tokensIssued = totalSupply().mul(proportion).div(HUNDRED_PERC);
     }
 
@@ -179,7 +208,7 @@ contract LETH is
     {
         // improve these by using r and w math functions
         uint proportion = _tokenAmount.mul(HUNDRED_PERC).div(totalSupply());
-        _totalValue = getMaxCollateral().mul(proportion).div(HUNDRED_PERC);
+        _totalValue = getPositiveCollateral().mul(proportion).div(HUNDRED_PERC);
         _fee = _totalValue.mul(FEE_PERC).div(HUNDRED_PERC);
         _finalValue = _totalValue.sub(_fee);
     }
@@ -214,6 +243,9 @@ contract LETH is
         (bool payoutSuccess,) = msg.sender.call.value(collateralToReturn)("");
         require(payoutSuccess, "eth payment reverted");
 
+        // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
+        require(getRatio() >= getMinRatio(), "cannot violate collateral safety ratio");
+
         emit Redeemed(
             msg.sender, 
             _tokensToRedeem,
@@ -221,6 +253,8 @@ contract LETH is
             collateralToUnlock,
             collateralToReturn);
     }
+    
+    function () external payable { }
 }
 
 contract KovanContracts
