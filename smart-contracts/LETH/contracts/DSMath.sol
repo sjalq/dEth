@@ -1,3 +1,5 @@
+pragma solidity ^0.5.17;
+
 contract DSMath {
     function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x + y) >= x);
