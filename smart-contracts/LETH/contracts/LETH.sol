@@ -1,5 +1,6 @@
 pragma solidity ^0.5.17;
 
+import "../../common.5/openzeppelin/token/ERC20/IERC20.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
