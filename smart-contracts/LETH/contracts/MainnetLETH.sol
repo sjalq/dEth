@@ -1,39 +1,23 @@
 pragma solidity ^0.5.0;
 
 import "./LETH.sol";
-/*import "./SaverProxy.sol" as A;
-import "./SaverProxyActions.sol" as B;
-
-contract SaverScript
-{
-    event Log(address _contract);
-    constructor() 
-        public
-    {
-        emit Log(address(new A.MCDSaverProxy()));
-        emit Log(address(new B.SaverProxyActions()));
-    }
-}*/
 
 contract MainnetLETH is LETH
 {
     constructor()
         public
         LETH(
-            0x371DBbe4Be1D3201A98dD1b97A58E71cA5AB4b9C,             //_owner,
-            0x9FFa1ca74425A4504aeb39Fc35AcC0EB3a16A00A,             //_gulper,
-            IDSProxy(0x18530Bf1f8fBbc7823C82c563c826E1F95673880),   //_cdpDSProxy,
-            2937,                                                   //_cdpId,
+            0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_owner,
+            0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_gulper,
+            IDSProxy(0x15282F5E014C3FCdCD5A184a924e830a46A4Fb34),       //_cdpDSProxy,
+            18783,                                                      //_cdpId,
 
-            0x1476483dD8C35F25e568113C5f70249D3976ba21,             //_makerManager,
-            0xd19A770F00F89e6Dd1F12E6D6E6839b95C084D85,             //_ethGemJoin,
+            0x5ef30b9986345249bc32d8928B7ee64DE9435E39,                 //_makerManager,
+            0x2F0b23f53734252Bda2277357e97e1517d6B042A,                 //_ethGemJoin,
 
-            IMCDSaverProxy(0x0C56862c666eA39bFe669fdF309A542bF9b28a34),
-            0x5B846f336C08741526B4E18C28384AbbdF4B3e1d,
+            IMCDSaverProxy(0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47), //_saverProxy
+            0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038,                 //_saverProxyActions
 
-            0x371DBbe4Be1D3201A98dD1b97A58E71cA5AB4b9C)              //_initialRecipient)
-    { 
-        //saverProxy = IMCDSaverProxy(address(new A.MCDSaverProxy()));
-        //saverProxyActions = address(new B.SaverProxyActions());
-    }
+            0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb)                 //_initialRecipient)
+    { }
 }
