@@ -1,3 +1,9 @@
+// Listen up degen!
+// This token is called dETH (death get it) because it will kill your hard earned money!
+// This contract has no tests, it was tested manually a little on Kovan!
+// This contract has no audit, so you're just plain insane if you give this thing a cent!
+// I know the guy who wrote this and I wouldn't trust him with mission critical code!
+
 pragma solidity ^0.5.17;
 
 import "../../common.5/openzeppelin/token/ERC20/IERC20.sol";
@@ -47,7 +53,7 @@ contract Ownable
     }
 }
 
-contract LETH is 
+contract dETH is 
     Context, 
     ERC20Detailed, 
     ERC20,
@@ -83,7 +89,7 @@ contract LETH is
             
             address _initialRecipient)
         public
-        ERC20Detailed("Levered Ether", "LETH", 18)
+        ERC20Detailed("Derived Ether - Levered Ether", "dETH", 18)
         Ownable(_owner)
     {
         owner = _owner;
@@ -169,7 +175,7 @@ contract LETH is
         uint _collateralLocked,
         uint _tokensIssued);
 
-    function issue(address _receiver)
+    function squanderMyEthForWorthlessBeans(address _receiver)
         payable
         public
     { 

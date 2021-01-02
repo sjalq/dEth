@@ -1,6 +1,6 @@
 pragma solidity ^0.5.17;
 
-import "./LETH.sol";
+import "./dETH.sol";
 /*import "./SaverProxy.sol" as A;
 import "./SaverProxyActions.sol" as B;
 
@@ -15,11 +15,11 @@ contract SaverScript
     }
 }*/
 
-contract KovanLETH is LETH
+contract KovandETH is dETH
 {
     constructor()
         public
-        LETH(
+        dETH(
             0x371DBbe4Be1D3201A98dD1b97A58E71cA5AB4b9C,             //_owner,
             0x9FFa1ca74425A4504aeb39Fc35AcC0EB3a16A00A,             //_gulper,
             IDSProxy(0x18530Bf1f8fBbc7823C82c563c826E1F95673880),   //_cdpDSProxy,

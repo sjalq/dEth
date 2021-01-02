@@ -1,12 +1,12 @@
 pragma solidity ^0.5.0;
 
-import "./LETH.sol";
+import "./dETH.sol";
 
-contract MainnetLETH is LETH
+contract MainnetdETH is dETH
 {
     constructor()
         public
-        LETH(
+        dETH(
             0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_owner,
             0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_gulper,
             IDSProxy(0x15282F5E014C3FCdCD5A184a924e830a46A4Fb34),       //_cdpDSProxy,
