@@ -25,7 +25,7 @@ contract IMCDSaverProxy
 
 contract Ownable
 {
-    address owner; 
+    address public owner; 
 
     event OwnerChanged(address _newOwner);
 
