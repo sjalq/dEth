@@ -116,11 +116,11 @@ contract LETH is
     function getCollateral()
         public
         view
-        returns(uint _price, uint _totalCollateral, uint _debt, uint _debtCollateralDenominated, uint _positiveCollateral)
+        returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _positiveCollateral)
     {
         (_totalCollateral, _debt, _price,) = saverProxy.getCdpDetailedInfo(cdpId);
-        _debtCollateralDenominated = rdiv(_debt, _price);
-        _positiveCollateral = sub(_totalCollateral, _debtCollateralDenominated);
+        _collateralDenominatedDebt = rdiv(_debt, _price);
+        _positiveCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
 
     function getPositiveCollateral()
@@ -174,7 +174,7 @@ contract LETH is
         public
     { 
         // Goals:
-        // 1. deposits etg into the vault 
+        // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
 
         (uint collateralToLock, uint fee, uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
@@ -186,10 +186,11 @@ contract LETH is
             cdpId);
         cdpDSProxy.execute.value(collateralToLock)(saverProxyActions, proxyCall);
 
-        (bool feePaymentSuccess,) = gulper.call.value(fee)("");
-        require(feePaymentSuccess, "fee transfer to gulper failed");
         _mint(_receiver, tokensToIssue);
 
+        (bool feePaymentSuccess,) = gulper.call.value(fee)("");
+        require(feePaymentSuccess, "fee transfer to gulper failed");
+        
         emit Issued(
             _receiver, 
             msg.value, 
@@ -237,9 +238,11 @@ contract LETH is
             collateralToUnlock);
         cdpDSProxy.execute(saverProxyActions, proxyCall);
 
+        _burn(msg.sender, _tokensToRedeem);
+
         (bool feePaymentSuccess,) = gulper.call.value(fee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
-        _burn(msg.sender, _tokensToRedeem);
+        
         (bool payoutSuccess,) = msg.sender.call.value(collateralToReturn)("");
         require(payoutSuccess, "eth payment reverted");
 
@@ -255,16 +258,4 @@ contract LETH is
     }
     
     function () external payable { }
-}
-
-contract KovanContracts
-{
-    address public constant MANAGER_ADDRESS = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
-    address public constant ETH_GEM_JOIN = 0xd19A770F00F89e6Dd1F12E6D6E6839b95C084D85;
-}
-
-contract MainnetContracts
-{
-    address public constant MANAGER_ADDRESS = 0x1476483dD8C35F25e568113C5f70249D3976ba21;
-    address public constant ETH_GEM_JOIN = 0x08638eF1A205bE6762A8b935F5da9b700Cf7322c;
 }
