@@ -131,7 +131,7 @@ contract dETH is
         _minRatio = DSMath.rdiv(MIN_REDEMPTION_RATIO.mul(10**9), 100);
     }
 
-    function calculateIssuanceAmount(uint _collateralAmount)
+    function calculateIssuanceAmount(uint _suppliedCollateral)
         public
         view
         returns (
@@ -139,17 +139,17 @@ contract dETH is
             uint _fee,
             uint _tokensIssued)
     {
-        _fee = _collateralAmount.mul(FEE_PERC).div(HUNDRED_PERC);
-        _actualCollateralAdded = _collateralAmount.sub(_fee);
-        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getExcessCollateral());
-        _tokensIssued = totalSupply().mul(proportion).div(HUNDRED_PERC);
+        _fee = _suppliedCollateral.mul(FEE_PERC).div(HUNDRED_PERC);
+        _actualCollateralAdded = _suppliedCollateral.sub(_fee);
+        uint tokenSupplyPerc = _actualCollateralAdded.mul(HUNDRED_PERC).div(getExcessCollateral());
+        _tokensIssued = totalSupply().mul(tokenSupplyPerc).div(HUNDRED_PERC);
     }
 
     event Issued(
         address _receiver, 
-        uint _collateralProvided,
+        uint _suppliedCollateral,
         uint _fee,
-        uint _collateralLocked,
+        uint _actualCollateralAdded,
         uint _tokensIssued);
 
     function squanderMyEthForWorthlessBeans(address _receiver)
@@ -169,15 +169,14 @@ contract dETH is
             cdpId);
         
         // if something goes wrong, it's likely to go wrong here
-        // likely because this method either breaks because it is calling itself as if it's an
-        // external call, or because it breaks because it doesn't recognize the msg.sender (being not the owner)
-        // as a legitimate auth
+        // likely because this method breaks because it is calling itself as if it's an
+        // external call
         IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, proxyCall);
-
-        _mint(_receiver, tokensToIssue);
-
+        
         (bool feePaymentSuccess,) = gulper.call.value(fee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
+
+        _mint(_receiver, tokensToIssue);
         
         emit Issued(
             _receiver, 
@@ -187,43 +186,47 @@ contract dETH is
             tokensToIssue);
     }
 
-    function calculateRedemptionValue(uint _tokenAmount)
+    function calculateRedemptionValue(uint _tokensToRedeem)
         public
         view
         returns (
-            uint _totalValue, 
+            uint _totalCollateralRedeemed, 
             uint _fee, 
-            uint _finalValue)
+            uint _collateralReturned)
     {
-        require(_tokenAmount <= totalSupply(), "_tokenAmount exceeds totalSupply()");
-        uint proportion = _tokenAmount.mul(HUNDRED_PERC).div(totalSupply());
-        _totalValue = getExcessCollateral().mul(proportion).div(HUNDRED_PERC);
-        _fee = _totalValue.mul(FEE_PERC).div(HUNDRED_PERC);
-        _finalValue = _totalValue.sub(_fee);
+        // comment: a full check against the minimum ratio might be added in a future version
+        // for now keep in mind that this function may return values greater than those that 
+        // could be executed in one transaction. 
+        require(_tokensToRedeem <= totalSupply(), "_tokensToRedeem exceeds totalSupply()");
+        uint tokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
+        _totalCollateralRedeemed = getExcessCollateral().mul(tokenSupplyPerc).div(HUNDRED_PERC);
+        _fee = _totalCollateralRedeemed.mul(FEE_PERC).div(HUNDRED_PERC);
+        _collateralReturned = _totalCollateralRedeemed.sub(_fee);
     }
 
     event Redeemed(
+        address _redeemer,
         address _receiver, 
         uint _tokensRedeemed,
         uint _fee,
-        uint _collateralUnlocked,
+        uint _totalCollateralFreed,
         uint _collateralReturned);
 
-    function redeem(uint _tokensToRedeem)
+    function redeem(uint _tokensToRedeem, address _receiver)
         public
     {
         // Goals:
         // 1. if the _tokensToRedeem being claimed does not drain the vault to below 160%
         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
 
-        (uint collateralToUnlock, uint fee, uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
+        (uint collateralToFree, uint fee, uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
 
         bytes memory proxyCall = abi.encodeWithSignature(
             "freeETH(address,address,uint256,uint256)",
             makerManager, 
             ethGemJoin, 
             cdpId,
-            collateralToUnlock);
+            collateralToFree);
         IDSProxy(address(this)).execute(saverProxyActions, proxyCall);
 
         _burn(msg.sender, _tokensToRedeem);
@@ -231,17 +234,18 @@ contract dETH is
         (bool feePaymentSuccess,) = gulper.call.value(fee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
         
-        (bool payoutSuccess,) = msg.sender.call.value(collateralToReturn)("");
+        (bool payoutSuccess,) = _receiver.call.value(collateralToReturn)("");
         require(payoutSuccess, "eth payment reverted");
 
         // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
         require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
 
         emit Redeemed(
-            msg.sender, 
+            msg.sender,
+            _receiver, 
             _tokensToRedeem,
             fee,
-            collateralToUnlock,
+            collateralToFree,
             collateralToReturn);
     }
     
