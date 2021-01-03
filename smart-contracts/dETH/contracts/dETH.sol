@@ -90,7 +90,7 @@ contract dETH is
             cdpId, 
             _dsProxy);
         
-        execute(saverProxyActions, proxyCall);
+        IDSProxy(address(this)).execute(saverProxyActions, proxyCall);
     }
 
     function getCollateral()
