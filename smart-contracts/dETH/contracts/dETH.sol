@@ -35,7 +35,7 @@ contract dETH is
     uint constant FEE_PERC = 9*10**15;      //   0.9%
     uint constant ONE_PERC = 10**16;        //   1.0% 
     uint constant HUNDRED_PERC = 10**18;    // 100.0%
-    uint constant MIN_RATIO = 140;          // Minimum ration in normal percentages
+    uint constant MIN_REDEMPTION_RATIO = 140;          // Minimum ration in normal percentages
 
     address payable public gulper;
     uint public cdpId;
@@ -120,15 +120,15 @@ contract dETH is
         _ratio = saverProxy.getRatio(cdpId, ilk);
     }
 
-    function getMinRatio()
+    function getMinRedemptionRatio()
         public
         pure
         returns(uint _minRatio)
     {
         // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
-        // set MIN_RATIO to 140 for clarity and rather just multiply it by 10^9 here so that
+        // set MIN_REDEMPTION_RATIO to 140 for clarity and rather just multiply it by 10^9 here so that
         // it is on the same order as getRatio() when comparing the two.
-        _minRatio = DSMath.rdiv(MIN_RATIO.mul(10**9), 100);
+        _minRatio = DSMath.rdiv(MIN_REDEMPTION_RATIO.mul(10**9), 100);
     }
 
     function calculateIssuanceAmount(uint _collateralAmount)
@@ -235,7 +235,7 @@ contract dETH is
         require(payoutSuccess, "eth payment reverted");
 
         // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
-        require(getRatio() >= getMinRatio(), "cannot violate collateral safety ratio");
+        require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
 
         emit Redeemed(
             msg.sender, 
