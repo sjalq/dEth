@@ -10,11 +10,11 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./DSMath.sol";
+import "./DSProxy.sol";
 
 contract IDSProxy
 {
     function execute(address _target, bytes memory _data) public payable returns (bytes32);
-    function setOwner(address owner_) public;
 }
 
 contract IMCDSaverProxy
@@ -23,41 +23,12 @@ contract IMCDSaverProxy
     function getRatio(uint _cdpId, bytes32 _ilk) public view returns (uint);
 }
 
-contract Ownable
-{
-    address public owner; 
-
-    event OwnerChanged(address _newOwner);
-
-    constructor(address _owner)
-        public
-    {
-        owner = _owner;
-        emit OwnerChanged(_owner);
-    }
-
-    modifier onlyOwner
-    {
-        require(msg.sender == owner, "only owner may call");
-        _;
-    }
-
-    function changeOwner(address _newOwner)
-        public
-        onlyOwner
-    {
-        // owner is burnable so no 0x00 check is included.
-        owner = _newOwner;
-        emit OwnerChanged(owner);
-    }
-}
-
 contract dETH is 
     Context, 
     ERC20Detailed, 
     ERC20,
     DSMath,
-    Ownable
+    DSProxy
 {
     using SafeMath for uint;
 
@@ -67,7 +38,6 @@ contract dETH is
     uint constant MIN_RATIO = 140;
 
     address payable public gulper;
-    IDSProxy public cdpDSProxy;
     uint public cdpId;
     
     address public makerManager;
@@ -76,24 +46,22 @@ contract dETH is
     address public saverProxyActions;
     
     constructor(
-            address _owner,
             address payable _gulper,
-            IDSProxy _cdpDSProxy,
+            address _proxyCache,
             uint _cdpId,
 
             address _makerManager,
             address _ethGemJoin,
+            
             IMCDSaverProxy _saverProxy,
             address _saverProxyActions,
             
             address _initialRecipient)
         public
+        DSProxy(_proxyCache)
         ERC20Detailed("Derived Ether - Levered Ether", "dETH", 18)
-        Ownable(_owner)
     {
-        owner = _owner;
         gulper = _gulper;
-        cdpDSProxy = _cdpDSProxy;
         cdpId = _cdpId;
 
         makerManager = _makerManager;
@@ -104,16 +72,9 @@ contract dETH is
         _mint(_initialRecipient, getPositiveCollateral());
     }
 
-    function changeDSProxyOwner(address _newDSProxyOwner)
-        public
-        onlyOwner
-    {
-        cdpDSProxy.setOwner(_newDSProxyOwner);
-    }
-
     function changeGulper(address payable _newGulper)
         public
-        onlyOwner
+        auth
     {
         gulper = _newGulper;
     }
@@ -189,7 +150,12 @@ contract dETH is
             makerManager, 
             ethGemJoin, 
             cdpId);
-        cdpDSProxy.execute.value(collateralToLock)(saverProxyActions, proxyCall);
+        
+        // if something goes wrong, it's likely to go wrong here
+        // likely because this method either breaks because it is calling itself as if it's an
+        // external call, or because it breaks because it doesn't recognize the msg.sender (being not the owner)
+        // as a legitimate auth
+        IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, proxyCall);
 
         _mint(_receiver, tokensToIssue);
 
@@ -241,7 +207,7 @@ contract dETH is
             ethGemJoin, 
             cdpId,
             collateralToUnlock);
-        cdpDSProxy.execute(saverProxyActions, proxyCall);
+        IDSProxy(address(this)).execute(saverProxyActions, proxyCall);
 
         _burn(msg.sender, _tokensToRedeem);
 

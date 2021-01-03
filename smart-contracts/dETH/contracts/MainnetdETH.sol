@@ -7,9 +7,8 @@ contract MainnetdETH is dETH
     constructor()
         public
         dETH(
-            0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_owner,
             0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_gulper,
-            IDSProxy(0x15282F5E014C3FCdCD5A184a924e830a46A4Fb34),       //_cdpDSProxy,
+            0xb38cedE531C635E7AB5e2303aD2045CA843E110A,                 //_proxyCache TODO: FIX THIS IS NOT THE RIGHT MAINNET ONE!
             18783,                                                      //_cdpId,
 
             0x5ef30b9986345249bc32d8928B7ee64DE9435E39,                 //_makerManager,

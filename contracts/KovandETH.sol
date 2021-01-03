@@ -21,7 +21,6 @@ contract KovandETH is dETH
         public
         dETH(
             0x9FFa1ca74425A4504aeb39Fc35AcC0EB3a16A00A,             //_gulper,
-            0xb38cedE531C635E7AB5e2303aD2045CA843E110A,             //_proxyCache
             2937,                                                   //_cdpId,
 
             0x1476483dD8C35F25e568113C5f70249D3976ba21,             //KovanContracts.MANAGER_ADDRESS, //_makerManager,
