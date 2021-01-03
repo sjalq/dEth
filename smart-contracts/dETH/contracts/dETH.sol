@@ -35,13 +35,14 @@ contract dETH is
     uint constant FEE_PERC = 9*10**15;      //   0.9%
     uint constant ONE_PERC = 10**16;        //   1.0% 
     uint constant HUNDRED_PERC = 10**18;    // 100.0%
-    uint constant MIN_RATIO = 140;
+    uint constant MIN_RATIO = 140;          // Minimum ration in normal percentages
 
     address payable public gulper;
     uint public cdpId;
     
     address public makerManager;
     address public ethGemJoin;
+
     IMCDSaverProxy public saverProxy;
     address public saverProxyActions;
     
@@ -69,7 +70,7 @@ contract dETH is
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
         
-        _mint(_initialRecipient, getPositiveCollateral());
+        _mint(_initialRecipient, getExcessCollateral());
     }
 
     function changeGulper(address payable _newGulper)
@@ -95,19 +96,19 @@ contract dETH is
     function getCollateral()
         public
         view
-        returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _positiveCollateral)
+        returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
         (_totalCollateral, _debt, _price,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _price);
-        _positiveCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
+        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
 
-    function getPositiveCollateral()
+    function getExcessCollateral()
         public
         view
-        returns(uint _positiveCollateral)
+        returns(uint _excessCollateral)
     {
-        (,,,, _positiveCollateral) = getCollateral();
+        (,,,, _excessCollateral) = getCollateral();
     }
 
     function getRatio()
@@ -137,7 +138,7 @@ contract dETH is
     {
         _fee = _collateralAmount.mul(FEE_PERC).div(HUNDRED_PERC);
         _actualCollateralAdded = _collateralAmount.sub(_fee);
-        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getPositiveCollateral());
+        uint proportion = _actualCollateralAdded.mul(HUNDRED_PERC).div(getExcessCollateral());
         _tokensIssued = totalSupply().mul(proportion).div(HUNDRED_PERC);
     }
 
@@ -193,7 +194,7 @@ contract dETH is
     {
         require(_tokenAmount <= totalSupply(), "_tokenAmount exceeds totalSupply()");
         uint proportion = _tokenAmount.mul(HUNDRED_PERC).div(totalSupply());
-        _totalValue = getPositiveCollateral().mul(proportion).div(HUNDRED_PERC);
+        _totalValue = getExcessCollateral().mul(proportion).div(HUNDRED_PERC);
         _fee = _totalValue.mul(FEE_PERC).div(HUNDRED_PERC);
         _finalValue = _totalValue.sub(_fee);
     }
