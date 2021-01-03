@@ -85,7 +85,7 @@ contract dETH is
         auth
     {
         bytes memory proxyCall = abi.encodeWithSignature(
-            "give(address,uint,address)", 
+            "give(address,uint256,address)", 
             makerManager, 
             cdpId, 
             _dsProxy);
