@@ -79,6 +79,19 @@ contract dETH is
         gulper = _newGulper;
     }
 
+    function giveCDPToDSProxy(address _dsProxy)
+        public
+        auth
+    {
+        bytes memory proxyCall = abi.encodeWithSignature(
+            "give(address,uint,address)", 
+            makerManager, 
+            cdpId, 
+            _dsProxy);
+        
+        execute(saverProxyActions, proxyCall);
+    }
+
     function getCollateral()
         public
         view
