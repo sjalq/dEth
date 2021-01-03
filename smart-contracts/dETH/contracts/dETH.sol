@@ -125,6 +125,9 @@ contract dETH is
         pure
         returns(uint _minRatio)
     {
+        // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
+        // set MIN_RATIO to 140 for clarity and rather just multiply it by 10^9 here so that
+        // it is on the same order as getRatio() when comparing the two.
         _minRatio = DSMath.rdiv(MIN_RATIO.mul(10**9), 100);
     }
 
