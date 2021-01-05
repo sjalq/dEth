@@ -35,7 +35,7 @@ contract dETH is
     uint constant FEE_PERC = 9*10**15;      //   0.9%
     uint constant ONE_PERC = 10**16;        //   1.0% 
     uint constant HUNDRED_PERC = 10**18;    // 100.0%
-    uint constant MIN_REDEMPTION_RATIO = 140;          // Minimum ration in normal percentages
+    uint constant MIN_REDEMPTION_RATIO = 160;          // Minimum ration in normal percentages
 
     address payable public gulper;
     uint public cdpId;
@@ -270,10 +270,10 @@ contract dETH is
         bytes memory proxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            155 * 10**16, 
+            170 * 10**16, 
+            200 * 10**16,
             185 * 10**16,
-            170 * 10**16,
-            170 * 10**16,
+            185 * 10**16,
             true,
             true,
             subscriptions);
