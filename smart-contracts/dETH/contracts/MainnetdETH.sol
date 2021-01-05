@@ -8,7 +8,7 @@ contract MainnetdETH is dETH
         public
         dETH(
             0x98D619675B9E1441F2b87E6d7638eaeDbf6e15Fb,                 //_gulper,
-            0xb38cedE531C635E7AB5e2303aD2045CA843E110A,                 //_proxyCache TODO: FIX THIS IS NOT THE RIGHT MAINNET ONE!
+            0x271293c67E2D3140a0E9381EfF1F9b01E07B0795,                 //_proxyCache,
             18783,                                                      //_cdpId,
 
             0x5ef30b9986345249bc32d8928B7ee64DE9435E39,                 //_makerManager,
