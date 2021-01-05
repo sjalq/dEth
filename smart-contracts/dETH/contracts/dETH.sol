@@ -253,7 +253,7 @@ contract dETH is
         public
         auth
     {
-        // for reference: 
+        // for reference - this function is called on the subscriptionsProxyV2: 
         // function subscribe(
         //     uint _cdpId, 
         //     uint128 _minRatio, 
@@ -267,7 +267,6 @@ contract dETH is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
-
         bytes memory proxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
@@ -278,8 +277,7 @@ contract dETH is
             true,
             true,
             subscriptions);
-        //IDSProxy(address(this)).
-        execute(subscriptionsProxyV2, proxyCall);
+        IDSProxy(address(this)).execute(subscriptionsProxyV2, proxyCall);
     }
     
     function () external payable { }
