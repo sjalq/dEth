@@ -1,3 +1,4 @@
 smart-contracts/dETH/build/
 artifacts/
 smart-contracts/dETH/build/contracts/Common.json
+smart-contracts/dETH/tests/
