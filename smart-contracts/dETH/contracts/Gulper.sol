@@ -89,4 +89,6 @@ contract Gulper
         emit gulped(wethBalanceToConvert, poolTokensToBurn, pokeReward);
         msg.sender.call.value(pokeReward)("");
     }
+
+    function () external payable { }
 }
