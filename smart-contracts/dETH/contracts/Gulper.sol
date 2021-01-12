@@ -90,5 +90,12 @@ contract Gulper
         msg.sender.call.value(pokeReward)("");
     }
 
-    function () external payable { }
+    event ethReceived(address _from, uint _amount); 
+
+    function () 
+        external 
+        payable 
+    { 
+        emit ethReceived(msg.sender, msg.value);
+    }
 }
