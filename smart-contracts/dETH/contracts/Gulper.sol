@@ -61,7 +61,7 @@ contract Gulper
                 10 * 10**18,
                 _wethBalanceToConvert,
                 10**17);
-        _minTokensToClaim = tokensOut.mul(100 * 10**9).div(95 * 10**9);
+        _minTokensToClaim = tokensOut.mul(95 * 10**9).div(100 * 10**9);
     }
 
     function gulp() 
@@ -79,7 +79,6 @@ contract Gulper
         // *send a reward to msg.sender for poking the contract. 
 
         (uint wethBalanceToConvert, uint minTokensToClaim, uint pokeReward) = getGulpDetails();
-        
         IERC20Wrapper(WETH).deposit.value(address(this).balance)();
         BalancerPool(POOL).joinswapExternAmountIn(WETH, wethBalanceToConvert, minTokensToClaim);
         uint poolTokensToBurn = BalancerPool(POOL).balanceOf(address(this)); 
@@ -91,6 +90,12 @@ contract Gulper
     }
 
     event ethReceived(address _from, uint _amount); 
+    
+    function approveWethToPool()
+        public
+    {
+        IERC20Wrapper(WETH).approve(POOL, uint(-1));
+    }
 
     function () 
         external 
