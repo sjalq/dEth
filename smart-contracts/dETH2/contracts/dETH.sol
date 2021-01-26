@@ -69,13 +69,14 @@ contract Oracle
         returns (uint _price)
     {
         // maker's price comes back as a decimal with 18 places
-        uint makerEthUsdPrice = uint(makerOracle.read()).div(10**10); 
+        uint makerEthUsdPrice = uint(makerOracle.read()); 
         (,int chainlinkEthUsdPrice,,,) = ethUsdOracle.latestRoundData();
         (,int chainlinkDaiUsdPrice,,,) = ethUsdOracle.latestRoundData();
 
         // chainlink's price comes back as a decimal with 8 places
         // here we remove the 8 places added by the uint mul
-        uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).div(10**8);
+        // and add 2 places to make it a "WAD" number type with ".div(10**8)"
+        uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).div(10**6);
     
         // if the differnce between the ethdai price from chainlink is more than 5% different from the
         // maker oracle price, trust the maker oracle 
