@@ -1,6 +1,11 @@
 smart-contracts/dETH/build/
 artifacts/
 smart-contracts/dETH/build/contracts/Common.json
-smart-contracts/dETH/tests/
 smart-contracts/dETH2/build/
-smart-contracts/dETH2/tests/
+
+.fake
+.ionide
+.vs
+
+bin/
+obj/

@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp5.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Remove="ContractDefinition\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DTOs/ForwarderDefinition.fs" />
+    <Compile Include="DTOs/DebugDefinition.fs" />
+    <Compile Include="DTOs/TestTokenDefinition.fs" />
+    <Compile Include="DTOs/BucketSaleDefinition.fs" />
+    <Compile Include="Constants.fs" />
+    <Compile Include="TestBase.fs" />
+    <Compile Include="BucketSaleTestBase.fs" />
+    <Compile Include="Tests.fs" />
+    <!-- <Compile Include="Program.fs" /> -->
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Data" Version="3.3.3" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
+    <!--PackageReference Include="Nethereum.Web3" Version="5.0.101" /-->
+    <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FsUnit.xUnit" Version="3.7.0" />
+  </ItemGroup>
+</Project>

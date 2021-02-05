@@ -1,0 +1,2 @@
+Use this seed phrase with ganache to generate the accounts the tests use:
+join topple vapor pepper sell enter isolate pact syrup shoulder route token

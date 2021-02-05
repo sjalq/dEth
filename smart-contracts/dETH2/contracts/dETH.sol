@@ -40,7 +40,6 @@ contract IMakerOracle
 {
     function read()
         public 
-        virtual
         view 
         returns(bytes32);
 }
@@ -64,24 +63,24 @@ contract Oracle
         ethUsdOracle = _ethUsdOracle;
     }
 
-    function ethDaiPrice() 
+    function getEthDaiPrice() 
         public
         returns (uint _price)
     {
         // maker's price comes back as a decimal with 18 places
         uint makerEthUsdPrice = uint(makerOracle.read()); 
         (,int chainlinkEthUsdPrice,,,) = ethUsdOracle.latestRoundData();
-        (,int chainlinkDaiUsdPrice,,,) = ethUsdOracle.latestRoundData();
+        (,int chainlinkDaiUsdPrice,,,) = daiUsdOracle.latestRoundData();
 
         // chainlink's price comes back as a decimal with 8 places
         // here we remove the 8 places added by the uint mul
         // and add 2 places to make it a "WAD" number type with ".div(10**8)"
         uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).div(10**6);
     
-        // if the differnce between the ethdai price from chainlink is more than 5% different from the
+        // if the differnce between the ethdai price from chainlink is more than 10% different from the
         // maker oracle price, trust the maker oracle 
         uint percDiff = absDiff(makerEthUsdPrice, chainlinkDaiUsdPrice).mul(10**4).div(makerEthUsdPrice);
-        return percDiff > 50 ? 
+        return percDiff > 100 ? 
             chainlinkEthDaiPrice : 
             makerEthUsdPrice;
     }
@@ -116,6 +115,7 @@ contract dETH is
 
     IMCDSaverProxy public saverProxy;
     address public saverProxyActions;
+    Oracle public oracle;
     
     constructor(
             address payable _gulper,
@@ -127,6 +127,7 @@ contract dETH is
             
             IMCDSaverProxy _saverProxy,
             address _saverProxyActions,
+            Oracle _oracle,
             
             address _initialRecipient)
         public
@@ -140,6 +141,7 @@ contract dETH is
         ethGemJoin = _ethGemJoin;
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
+        oracle = _oracle;
         
         _mint(_initialRecipient, getExcessCollateral());
     }
@@ -169,7 +171,8 @@ contract dETH is
         view
         returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
-        (_totalCollateral, _debt, _price,) = saverProxy.getCdpDetailedInfo(cdpId);
+        _price = getCollateralPrice();
+        (_totalCollateral, _debt,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _price);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
@@ -178,8 +181,8 @@ contract dETH is
         public
         returns (uint _price)
     {
-        (,,_price,) = saverProxy.getCdpDetailedInfo(cdpId);
-        
+        // we multiply by 10^9 to cast the price to a RAY number as used by the Maker CDP
+        _price = oracle.getEthDaiPrice().mul(10**9);
     }
 
     function getExcessCollateral()
@@ -241,6 +244,8 @@ contract dETH is
 
         (uint collateralToLock, uint fee, uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
 
+
+        // todo : stop using proxyCall in favour of more descriptive 
         bytes memory proxyCall = abi.encodeWithSignature(
             "lockETH(address,address,uint256)", 
             makerManager, 
@@ -317,6 +322,7 @@ contract dETH is
         require(payoutSuccess, "eth payment reverted");
 
         // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
+        // to prevent bites, getRatio() doesn't use oracle but the price set in the MakerCDP system 
         require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
 
         emit Redeemed(
@@ -328,7 +334,10 @@ contract dETH is
             collateralToReturn);
     }
 
-    function automate()
+    function automate(
+            uint _min,
+            uint _mid,
+            uint _max)
         public
         auth
     {
@@ -349,10 +358,10 @@ contract dETH is
         bytes memory proxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            170 * 10**16, 
-            200 * 10**16,
-            185 * 10**16,
-            185 * 10**16,
+            _min * 10**16, 
+            _max * 10**16,
+            _mid * 10**16,
+            _mid * 10**16,
             true,
             true,
             subscriptions);
