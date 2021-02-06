@@ -12,6 +12,15 @@ import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./DSMath.sol";
 import "./DSProxy.sol";
 
+contract IDSGuard is DSAuthority
+{
+    function permit(address src, address dst, bytes32 sig) public;
+}
+
+contract IDSGuardFactory {
+    function newGuard() public returns (IDSGuard guard);
+}
+
 contract IDSProxy
 {
     function execute(address _target, bytes memory _data) public payable returns (bytes32);
@@ -61,10 +70,11 @@ contract Oracle
         makerOracle = _makerOracle;
         daiUsdOracle = _daiUsdOracle;
         ethUsdOracle = _ethUsdOracle;
-    }
+    }   
 
     function getEthDaiPrice() 
         public
+        view
         returns (uint _price)
     {
         // maker's price comes back as a decimal with 18 places
@@ -79,7 +89,7 @@ contract Oracle
     
         // if the differnce between the ethdai price from chainlink is more than 10% different from the
         // maker oracle price, trust the maker oracle 
-        uint percDiff = absDiff(makerEthUsdPrice, chainlinkDaiUsdPrice).mul(10**4).div(makerEthUsdPrice);
+        uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkDaiUsdPrice)).mul(10**4).div(makerEthUsdPrice);
         return percDiff > 100 ? 
             chainlinkEthDaiPrice : 
             makerEthUsdPrice;
@@ -87,6 +97,7 @@ contract Oracle
 
     function absDiff(uint a, uint b)
         internal
+        view
         returns(uint)
     {
         return a > b ? a - b : b - a;
@@ -129,7 +140,10 @@ contract dETH is
             address _saverProxyActions,
             Oracle _oracle,
             
-            address _initialRecipient)
+            address _initialRecipient,
+            
+            address _DSGuardFactory,
+            address _FoundryTreasury)
         public
         DSProxy(_proxyCache)
         ERC20Detailed("Derived Ether - Levered Ether", "dETH", 18)
@@ -144,6 +158,21 @@ contract dETH is
         oracle = _oracle;
         
         _mint(_initialRecipient, getExcessCollateral());
+
+        // set the relevant authorities to make sure the parameters can be adjusted later on
+        IDSGuard guard = IDSGuardFactory(_DSGuardFactory).newGuard();
+        guard.permit(
+            _FoundryTreasury,
+            address(this),
+            bytes4(keccak256("function automate(uint256,uint256,uint256)")));
+        setAuthority(guard);
+
+        require(
+            authority.canCall(
+                _FoundryTreasury, 
+                address(this), 
+                bytes4(keccak256("function automate(uint256,uint256,uint256)"))),
+            "guard setting failed");
     }
 
     function changeGulper(address payable _newGulper)
@@ -172,13 +201,14 @@ contract dETH is
         returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
         _price = getCollateralPrice();
-        (_totalCollateral, _debt,) = saverProxy.getCdpDetailedInfo(cdpId);
+        (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _price);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
 
     function getCollateralPrice()
         public
+        view
         returns (uint _price)
     {
         // we multiply by 10^9 to cast the price to a RAY number as used by the Maker CDP
