@@ -97,7 +97,7 @@ contract Oracle
 
     function absDiff(uint a, uint b)
         internal
-        view
+        pure
         returns(uint)
     {
         return a > b ? a - b : b - a;
