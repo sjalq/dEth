@@ -9,3 +9,4 @@ smart-contracts/dETH2/build/
 
 bin/
 obj/
+smart-contracts/dETH2/contracts/block.json
