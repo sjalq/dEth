@@ -53,6 +53,22 @@ contract IMakerOracle
         returns(bytes32);
 }
 
+contract IVAT
+{
+    function urns(bytes32 cdp, address owner)
+        public
+        view
+        returns(uint256);
+}
+
+contract IMakerManager 
+{
+    function VAT()
+        public
+        view
+        returns(IVAT);
+}
+
 contract Oracle
 {
     using SafeMath for uint256;
@@ -186,13 +202,13 @@ contract dETH is
         public
         auth
     {
-        bytes memory proxyCall = abi.encodeWithSignature(
+        bytes memory giveProxyCall = abi.encodeWithSignature(
             "give(address,uint256,address)", 
             makerManager, 
             cdpId, 
             _dsProxy);
         
-        IDSProxy(address(this)).execute(saverProxyActions, proxyCall);
+        IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
     }
 
     function getCollateral()
@@ -335,13 +351,13 @@ contract dETH is
 
         (uint collateralToFree, uint fee, uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
 
-        bytes memory proxyCall = abi.encodeWithSignature(
+        bytes memory freeETHProxyCall = abi.encodeWithSignature(
             "freeETH(address,address,uint256,uint256)",
             makerManager, 
             ethGemJoin, 
             cdpId,
             collateralToFree);
-        IDSProxy(address(this)).execute(saverProxyActions, proxyCall);
+        IDSProxy(address(this)).execute(saverProxyActions, freeETHProxyCall);
 
         _burn(msg.sender, _tokensToRedeem);
 
@@ -385,7 +401,7 @@ contract dETH is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
-        bytes memory proxyCall = abi.encodeWithSignature(
+        bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
             _min * 10**16, 
@@ -395,7 +411,39 @@ contract dETH is
             true,
             true,
             subscriptions);
-        IDSProxy(address(this)).execute(subscriptionsProxyV2, proxyCall);
+        IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
+    }
+
+    function moveVatEthToCDP()
+        public
+    {
+        // or reference - this function is called on the MakerManager
+        // function wipeAndFreeETH(
+        //     address manager,
+        //     address ethJoin,
+        //     address daiJoin,
+        //     uint cdp,
+        //     uint wadC,
+        //     uint wadD
+        // )
+
+        // goal :
+        // 1. get the ether in the urn for this cdp, back into the cdp itself
+
+        // logic :
+        // *look up the balance of the urn
+        // *frob that value back into the cdp
+
+        uint256 urnBalance = IMakerManager(makerManager).VAT().urns(bytes32(cdpId), address(this));
+
+        bytes memory frobProxyCall = abi.encodeWithSignature(
+            "frob(address,uint256,int256,int256)",
+            makerManager,
+            cdpId,
+            0,
+            int256(urnBalance));
+
+        IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
     }
     
     function () external payable { }
