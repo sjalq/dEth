@@ -420,11 +420,9 @@ contract dETH is
         // or reference - this function is called on the MakerManager
         // function wipeAndFreeETH(
         //     address manager,
-        //     address ethJoin,
-        //     address daiJoin,
         //     uint cdp,
-        //     uint wadC,
-        //     uint wadD
+        //     int256 dart, // change in debt, chould be 0
+        //     int256 dink  // change in collateral, should be the entire balance available for the urn owner
         // )
 
         // goal :
