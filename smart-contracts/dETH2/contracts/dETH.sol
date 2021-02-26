@@ -111,7 +111,7 @@ contract Oracle
         uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkDaiUsdPrice))
             .mul(HUNDRED_PERC)
             .div(makerEthUsdPrice);
-        return percDiff > 10.mul(ONE_PERC) ? 
+        return percDiff > ONE_PERC.mul(10) ? 
             makerEthUsdPrice :
             chainlinkEthDaiPrice;
     }
@@ -134,11 +134,10 @@ contract dETH is
 {
     using SafeMath for uint;
 
-    uint constant FEE_PERC = 9*10**15;                  //   0.9%
+    uint constant PROTOCOL_FEE_PERC = 9*10**15;                  //   0.9%
     uint constant ONE_PERC = 10**16;                    //   1.0% 
     uint constant HUNDRED_PERC = 10**18;                // 100.0%
-    uint constant MIN_REDEMPTION_RATIO = 160;           // Minimum ratio in discrete percentage points
-
+    
     address payable public gulper;
     uint public cdpId;
     
@@ -148,6 +147,14 @@ contract dETH is
     IMCDSaverProxy public saverProxy;
     address public saverProxyActions;
     Oracle public oracle;
+
+    // automation ranges
+    uint public repaymentRatio;
+    uint public targetRatio;
+    uint public boostRatio;
+    uint public minRedemptionRatio;
+
+    uint public automationFeePerc;
     
     constructor(
             address payable _gulper,
@@ -177,6 +184,8 @@ contract dETH is
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
         oracle = _oracle;
+        minRedemptionRatio = 160;
+        automationFeePerc = ONE_PERC;           //   1.0%
         
         _mint(_initialRecipient, getExcessCollateral());
 
@@ -185,14 +194,14 @@ contract dETH is
         guard.permit(
             _FoundryTreasury,
             address(this),
-            bytes4(keccak256("function automate(uint256,uint256,uint256)")));
+            bytes4(keccak256("function automate(uint256,uint256,uint256,uint256)")));
         setAuthority(guard);
 
         require(
             authority.canCall(
                 _FoundryTreasury, 
                 address(this), 
-                bytes4(keccak256("function automate(uint256,uint256,uint256)"))),
+                bytes4(keccak256("function automate(uint256,uint256,uint256,uint256)"))),
             "guard setting failed");
     }
 
@@ -255,13 +264,13 @@ contract dETH is
 
     function getMinRedemptionRatio()
         public
-        pure
+        view
         returns(uint _minRatio)
     {
         // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
         // set MIN_REDEMPTION_RATIO to 140 for clarity and rather just multiply it by 10^9 here so that
         // it is on the same order as getRatio() when comparing the two.
-        _minRatio = DSMath.rdiv(MIN_REDEMPTION_RATIO.mul(10**9), 100);
+        _minRatio = DSMath.rdiv(minRedemptionRatio.mul(10**9), 100);
     }
 
     function calculateIssuanceAmount(uint _suppliedCollateral)
@@ -269,11 +278,13 @@ contract dETH is
         view
         returns (
             uint _actualCollateralAdded,
-            uint _fee,
+            uint _protocolFee,
+            uint _automationFee,
             uint _tokensIssued)
     {
-        _fee = _suppliedCollateral.mul(FEE_PERC).div(HUNDRED_PERC);
-        _actualCollateralAdded = _suppliedCollateral.sub(_fee);
+        _protocolFee = _suppliedCollateral.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
+        _automationFee = _suppliedCollateral.mul(automationFeePerc).div(HUNDRED_PERC);
+        _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee);
         uint tokenSupplyPerc = _actualCollateralAdded.mul(HUNDRED_PERC).div(getExcessCollateral());
         _tokensIssued = totalSupply().mul(tokenSupplyPerc).div(HUNDRED_PERC);
     }
@@ -281,7 +292,8 @@ contract dETH is
     event Issued(
         address _receiver, 
         uint _suppliedCollateral,
-        uint _fee,
+        uint _protocolFee,
+        uint _automationFee,
         uint _actualCollateralAdded,
         uint _tokensIssued);
 
@@ -293,11 +305,9 @@ contract dETH is
         // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
 
-        (uint collateralToLock, uint fee, uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
+        (uint collateralToLock, uint protocolFee, uint automationFee, uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
 
-
-        // todo : stop using proxyCall in favour of more descriptive 
-        bytes memory proxyCall = abi.encodeWithSignature(
+        bytes memory lockETHproxyCall = abi.encodeWithSignature(
             "lockETH(address,address,uint256)", 
             makerManager, 
             ethGemJoin, 
@@ -306,9 +316,9 @@ contract dETH is
         // if something goes wrong, it's likely to go wrong here
         // likely because this method breaks because it is calling itself as if it's an
         // external call
-        IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, proxyCall);
+        IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, lockETHproxyCall);
         
-        (bool feePaymentSuccess,) = gulper.call.value(fee)("");
+        (bool feePaymentSuccess,) = gulper.call.value(protocolFee)("");
         require(feePaymentSuccess, "fee transfer to gulper failed");
 
         _mint(_receiver, tokensToIssue);
@@ -316,7 +326,8 @@ contract dETH is
         emit Issued(
             _receiver, 
             msg.value, 
-            fee, 
+            protocolFee,
+            automationFee, 
             collateralToLock, 
             tokensToIssue);
     }
@@ -326,7 +337,7 @@ contract dETH is
         view
         returns (
             uint _totalCollateralRedeemed, 
-            uint _fee, 
+            uint _fee,
             uint _collateralReturned)
     {
         // comment: a full check against the minimum ratio might be added in a future version
@@ -335,7 +346,7 @@ contract dETH is
         require(_tokensToRedeem <= totalSupply(), "_tokensToRedeem exceeds totalSupply()");
         uint tokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
         _totalCollateralRedeemed = getExcessCollateral().mul(tokenSupplyPerc).div(HUNDRED_PERC);
-        _fee = _totalCollateralRedeemed.mul(FEE_PERC).div(HUNDRED_PERC);
+        _fee = _totalCollateralRedeemed.mul(automationFeePerc).div(HUNDRED_PERC);
         _collateralReturned = _totalCollateralRedeemed.sub(_fee);
     }
 
@@ -386,9 +397,11 @@ contract dETH is
     }
 
     function automate(
-            uint _min,
-            uint _mid,
-            uint _max)
+            uint _repaymentRatio,
+            uint _targetRatio,
+            uint _boostRatio,
+            uint _minRedemptionRatio,
+            uint _automationFeePerc)
         public
         auth
     {
@@ -406,13 +419,19 @@ contract dETH is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
+        repaymentRatio = _repaymentRatio;
+        targetRatio = _targetRatio;
+        boostRatio = _boostRatio;
+        minRedemptionRatio = _minRedemptionRatio;
+        automationFeePerc = _automationFeePerc;
+
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            _min * 10**16, 
-            _max * 10**16,
-            _mid * 10**16,
-            _mid * 10**16,
+            repaymentRatio * 10**16, 
+            boostRatio * 10**16,
+            targetRatio * 10**16,
+            targetRatio * 10**16,
             true,
             true,
             subscriptions);
