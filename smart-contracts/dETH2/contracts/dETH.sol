@@ -73,6 +73,9 @@ contract Oracle
 {
     using SafeMath for uint256;
 
+    uint constant ONE_PERC = 10**16; // 1.0%
+    uint constant HUNDRED_PERC = 10**18; // 100.0%
+
     IMakerOracle public makerOracle;
     IChainLinkPriceOracle public daiUsdOracle;
     IChainLinkPriceOracle public ethUsdOracle;
@@ -99,16 +102,18 @@ contract Oracle
         (,int chainlinkDaiUsdPrice,,,) = daiUsdOracle.latestRoundData();
 
         // chainlink's price comes back as a decimal with 8 places
-        // here we remove the 8 places added by the uint mul
-        // and add 2 places to make it a "WAD" number type with ".div(10**8)"
+        // we need to remove the 8 decimal places added my uint mul, then add 2 places to convert it to a "WAD" type
+        // therefore ".div(10**6)"
         uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).div(10**6);
     
         // if the differnce between the ethdai price from chainlink is more than 10% different from the
         // maker oracle price, trust the maker oracle 
-        uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkDaiUsdPrice)).mul(10**4).div(makerEthUsdPrice);
-        return percDiff > 100 ? 
-            chainlinkEthDaiPrice : 
-            makerEthUsdPrice;
+        uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkDaiUsdPrice))
+            .mul(HUNDRED_PERC)
+            .div(makerEthUsdPrice);
+        return percDiff > 10.mul(ONE_PERC) ? 
+            makerEthUsdPrice :
+            chainlinkEthDaiPrice;
     }
 
     function absDiff(uint a, uint b)
@@ -132,7 +137,7 @@ contract dETH is
     uint constant FEE_PERC = 9*10**15;                  //   0.9%
     uint constant ONE_PERC = 10**16;                    //   1.0% 
     uint constant HUNDRED_PERC = 10**18;                // 100.0%
-    uint constant MIN_REDEMPTION_RATIO = 160;           // Minimum ration in normal percentages
+    uint constant MIN_REDEMPTION_RATIO = 160;           // Minimum ratio in discrete percentage points
 
     address payable public gulper;
     uint public cdpId;
