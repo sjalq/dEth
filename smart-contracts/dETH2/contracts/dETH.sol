@@ -134,9 +134,10 @@ contract dETH is
 {
     using SafeMath for uint;
 
-    uint constant PROTOCOL_FEE_PERC = 9*10**15;                  //   0.9%
     uint constant ONE_PERC = 10**16;                    //   1.0% 
     uint constant HUNDRED_PERC = 10**18;                // 100.0%
+
+    uint constant PROTOCOL_FEE_PERC = 9*10**15;         //   0.9%
     
     address payable public gulper;
     uint public cdpId;
@@ -148,12 +149,11 @@ contract dETH is
     address public saverProxyActions;
     Oracle public oracle;
 
-    // automation ranges
+    // automation variables
     uint public repaymentRatio;
     uint public targetRatio;
     uint public boostRatio;
     uint public minRedemptionRatio;
-
     uint public automationFeePerc;
     
     constructor(
@@ -174,7 +174,7 @@ contract dETH is
             address _FoundryTreasury)
         public
         DSProxy(_proxyCache)
-        ERC20Detailed("Derived Ether - Levered Ether", "dETH", 18)
+        ERC20Detailed("Derived Ether", "dEth", 18)
     {
         gulper = _gulper;
         cdpId = _cdpId;
@@ -194,14 +194,14 @@ contract dETH is
         guard.permit(
             _FoundryTreasury,
             address(this),
-            bytes4(keccak256("function automate(uint256,uint256,uint256,uint256)")));
+            bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)")));
         setAuthority(guard);
 
         require(
             authority.canCall(
                 _FoundryTreasury, 
                 address(this), 
-                bytes4(keccak256("function automate(uint256,uint256,uint256,uint256)"))),
+                bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)"))),
             "guard setting failed");
     }
 
@@ -230,13 +230,13 @@ contract dETH is
         view
         returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
-        _price = getCollateralPrice();
+        _price = getCollateralPriceRAY();
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _price);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
 
-    function getCollateralPrice()
+    function getCollateralPriceRAY()
         public
         view
         returns (uint _price)
@@ -268,8 +268,8 @@ contract dETH is
         returns(uint _minRatio)
     {
         // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
-        // set MIN_REDEMPTION_RATIO to 140 for clarity and rather just multiply it by 10^9 here so that
-        // it is on the same order as getRatio() when comparing the two.
+        // set minRedemptionRatio to an integer value of discrete whole percentages for clarity 
+        // and rather just multiply it by 10^9 here so that it is on the same order as getRatio() when comparing the two.
         _minRatio = DSMath.rdiv(minRedemptionRatio.mul(10**9), 100);
     }
 
@@ -277,15 +277,17 @@ contract dETH is
         public
         view
         returns (
-            uint _actualCollateralAdded,
             uint _protocolFee,
             uint _automationFee,
+            uint _actualCollateralAdded,
+            uint _accreditedCollateral,
             uint _tokensIssued)
     {
         _protocolFee = _suppliedCollateral.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
         _automationFee = _suppliedCollateral.mul(automationFeePerc).div(HUNDRED_PERC);
-        _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee);
-        uint tokenSupplyPerc = _actualCollateralAdded.mul(HUNDRED_PERC).div(getExcessCollateral());
+        _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee); // _protocolFee goes to the protocol 
+        _accreditedCollateral = _actualCollateralAdded.sub(_automationFee); // _automationFee goes to the pool of funds in the cdp to offset gas implications
+        uint tokenSupplyPerc = _accreditedCollateral.mul(HUNDRED_PERC).div(getExcessCollateral());
         _tokensIssued = totalSupply().mul(tokenSupplyPerc).div(HUNDRED_PERC);
     }
 
@@ -295,6 +297,7 @@ contract dETH is
         uint _protocolFee,
         uint _automationFee,
         uint _actualCollateralAdded,
+        uint _accreditedCollateral,
         uint _tokensIssued);
 
     function squanderMyEthForWorthlessBeans(address _receiver)
@@ -305,21 +308,24 @@ contract dETH is
         // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
 
-        (uint collateralToLock, uint protocolFee, uint automationFee, uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
+        (uint protocolFee, 
+        uint automationFee, 
+        uint collateralToLock, 
+        uint accreditedCollateral, 
+        uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
 
         bytes memory lockETHproxyCall = abi.encodeWithSignature(
             "lockETH(address,address,uint256)", 
             makerManager, 
-            ethGemJoin, 
+            ethGemJoin,
             cdpId);
         
-        // if something goes wrong, it's likely to go wrong here
-        // likely because this method breaks because it is calling itself as if it's an
-        // external call
         IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, lockETHproxyCall);
         
-        (bool feePaymentSuccess,) = gulper.call.value(protocolFee)("");
-        require(feePaymentSuccess, "fee transfer to gulper failed");
+        (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
+        require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
+
+        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
 
         _mint(_receiver, tokensToIssue);
         
@@ -329,6 +335,7 @@ contract dETH is
             protocolFee,
             automationFee, 
             collateralToLock, 
+            accreditedCollateral,
             tokensToIssue);
     }
 
@@ -336,8 +343,9 @@ contract dETH is
         public
         view
         returns (
-            uint _totalCollateralRedeemed, 
-            uint _fee,
+            uint _protocolFee,
+            uint _automationFee,
+            uint _collateralRedeemed, 
             uint _collateralReturned)
     {
         // comment: a full check against the minimum ratio might be added in a future version
@@ -345,27 +353,33 @@ contract dETH is
         // could be executed in one transaction. 
         require(_tokensToRedeem <= totalSupply(), "_tokensToRedeem exceeds totalSupply()");
         uint tokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
-        _totalCollateralRedeemed = getExcessCollateral().mul(tokenSupplyPerc).div(HUNDRED_PERC);
-        _fee = _totalCollateralRedeemed.mul(automationFeePerc).div(HUNDRED_PERC);
-        _collateralReturned = _totalCollateralRedeemed.sub(_fee);
+        uint collateralAffected = getExcessCollateral().mul(tokenSupplyPerc).div(HUNDRED_PERC);
+        _protocolFee = collateralAffected.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
+        _automationFee = collateralAffected.mul(automationFeePerc).div(HUNDRED_PERC);
+        _collateralRedeemed = collateralAffected.sub(_automationFee); // how much capital should go back to the 
+        _collateralReturned = collateralAffected.sub(_protocolFee).sub(_automationFee);
     }
 
     event Redeemed(
         address _redeemer,
         address _receiver, 
         uint _tokensRedeemed,
-        uint _fee,
-        uint _totalCollateralFreed,
+        uint _protocolFee,
+        uint _automationFee,
+        uint _collateralRedeemed,
         uint _collateralReturned);
 
-    function redeem(uint _tokensToRedeem, address _receiver)
+    function redeem(address _receiver, uint _tokensToRedeem)
         public
     {
         // Goals:
         // 1. if the _tokensToRedeem being claimed does not drain the vault to below 160%
         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
 
-        (uint collateralToFree, uint fee, uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
+        (uint protocolFee, 
+        uint automationFee, 
+        uint collateralToFree,
+        uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
 
         bytes memory freeETHProxyCall = abi.encodeWithSignature(
             "freeETH(address,address,uint256,uint256)",
@@ -377,8 +391,10 @@ contract dETH is
 
         _burn(msg.sender, _tokensToRedeem);
 
-        (bool feePaymentSuccess,) = gulper.call.value(fee)("");
-        require(feePaymentSuccess, "fee transfer to gulper failed");
+        (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
+        require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
+
+        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
         
         (bool payoutSuccess,) = _receiver.call.value(collateralToReturn)("");
         require(payoutSuccess, "eth payment reverted");
@@ -391,10 +407,18 @@ contract dETH is
             msg.sender,
             _receiver, 
             _tokensToRedeem,
-            fee,
+            protocolFee,
+            automationFee,
             collateralToFree,
             collateralToReturn);
     }
+    
+    event AutomationSettingsChanged(
+            uint _repaymentRatio,
+            uint _targetRatio,
+            uint _boostRatio,
+            uint _minRedemptionRatio,
+            uint _automationFeePerc);
 
     function automate(
             uint _repaymentRatio,
@@ -436,6 +460,13 @@ contract dETH is
             true,
             subscriptions);
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
+
+        emit AutomationSettingsChanged(
+            repaymentRatio,
+            targetRatio,
+            boostRatio,
+            minRedemptionRatio,
+            automationFeePerc);
     }
 
     function moveVatEthToCDP()
@@ -470,5 +501,3 @@ contract dETH is
     
     function () external payable { }
 }
-
-// test push to new repo
