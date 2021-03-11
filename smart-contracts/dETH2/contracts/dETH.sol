@@ -184,8 +184,6 @@ contract dETH is
         saverProxy = _saverProxy;
         saverProxyActions = _saverProxyActions;
         oracle = _oracle;
-        minRedemptionRatio = 160;
-        automationFeePerc = ONE_PERC;           //   1.0%
         
         _mint(_initialRecipient, getExcessCollateral());
 
@@ -202,7 +200,14 @@ contract dETH is
                 _FoundryTreasury, 
                 address(this), 
                 bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)"))),
-            "guard setting failed");
+            "guard setting failed"); /* */
+            
+        automate(
+            200,        // _repaymentRatio,
+            250,        // _targetRatio,
+            300,        // _boostRatio,
+            160,        // _minRedemptionRatio,
+            ONE_PERC);  // _automationFeePerc)
     }
 
     function changeGulper(address payable _newGulper)
