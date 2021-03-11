@@ -10,7 +10,7 @@ contract DeployMainnetDEth
         public
     {
         Oracle oracle = new Oracle(
-            IMakerOracle(0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553),                 //IMakerOracle _makerOracle,
+            IMakerOracle(0x729D19f657BD0614b4985Cf1D82531c67569197B),                 //IMakerOracle _makerOracle,
             IChainLinkPriceOracle(0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9),        //_daiUsdOracle
             IChainLinkPriceOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419));         //_ethUsdOracle
 
@@ -29,7 +29,7 @@ contract DeployMainnetDEth
 
             0xB7c6bB064620270F8c1daA7502bCca75fC074CF4,                 //_initialRecipient
             
-            0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419,                 //_dsGuardFactory
+            0x5a15566417e6C1c9546523066500bDDBc53F88C7,                 //_dsGuardFactory
             0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553);                //_foundryTreasury)
 
         emit LogContracts(oracle, mainnetDeth);
