@@ -4,7 +4,7 @@ import "./dETH.sol";
 
 contract DeployMainnetDEth 
 {
-    event LogContracts(Oracle _oracle, dETH _dEth);
+    event LogContracts(Oracle _oracle, dEth _dEth);
 
     constructor()
         public
@@ -14,7 +14,7 @@ contract DeployMainnetDEth
             IChainLinkPriceOracle(0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9),        //_daiUsdOracle
             IChainLinkPriceOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419));         //_ethUsdOracle
 
-        dETH mainnetDeth = new dETH(
+        dEth mainnet_dEth = new dEth(
             0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA,                 //_gulper,
             0x271293c67E2D3140a0E9381EfF1F9b01E07B0795,                 //_proxyCache,
             18963, //test
@@ -32,6 +32,8 @@ contract DeployMainnetDEth
             0x5a15566417e6C1c9546523066500bDDBc53F88C7,                 //_dsGuardFactory
             0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553);                //_foundryTreasury)
 
-        emit LogContracts(oracle, mainnetDeth);
+        mainnet_dEth.setOwner(msg.sender);
+
+        emit LogContracts(oracle, mainnet_dEth);
     }
 }

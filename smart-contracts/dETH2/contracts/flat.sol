@@ -885,9 +885,9 @@ contract Oracle
         (,int chainlinkDaiUsdPrice,,,) = daiUsdOracle.latestRoundData();
 
         // chainlink's price comes back as a decimal with 8 places
-        // we need to remove the 8 decimal places added my uint mul, then add 2 places to convert it to a "WAD" type
-        // therefore ".div(10**6)"
-        uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).div(10**6);
+        // multiplying two of them, produces 16 places
+        // we need it in the WAD format which has 18, therefore .mul(10**2) at the end
+        uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).mul(10**2);
     
         // if the differnce between the ethdai price from chainlink is more than 10% different from the
         // maker oracle price, trust the maker oracle 
@@ -933,9 +933,6 @@ contract dETH is
     Oracle public oracle;
 
     // automation variables
-    uint public repaymentRatio;
-    uint public targetRatio;
-    uint public boostRatio;
     uint public minRedemptionRatio;
     uint public automationFeePerc;
     
@@ -1203,6 +1200,9 @@ contract dETH is
             uint _minRedemptionRatio,
             uint _automationFeePerc);
 
+    // note: all values used by defisaver are in WAD format
+    // we do not need that level of precision on this method
+    // so for simplicity and readability they are all set in discrete percentages here
     function automate(
             uint _repaymentRatio,
             uint _targetRatio,
@@ -1226,28 +1226,25 @@ contract dETH is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
-        repaymentRatio = _repaymentRatio;
-        targetRatio = _targetRatio;
-        boostRatio = _boostRatio;
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            repaymentRatio * 10**16, 
-            boostRatio * 10**16,
-            targetRatio * 10**16,
-            targetRatio * 10**16,
+            _repaymentRatio * 10**16, 
+            _boostRatio * 10**16,
+            _targetRatio * 10**16,
+            _targetRatio * 10**16,
             true,
             true,
             subscriptions);
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
 
         emit AutomationSettingsChanged(
-            repaymentRatio,
-            targetRatio,
-            boostRatio,
+            _repaymentRatio,
+            _targetRatio,
+            _boostRatio,
             minRedemptionRatio,
             automationFeePerc);
     }
@@ -1298,7 +1295,7 @@ contract DeployMainnetDEth
         public
     {
         Oracle oracle = new Oracle(
-            IMakerOracle(0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553),                 //IMakerOracle _makerOracle,
+            IMakerOracle(0x729D19f657BD0614b4985Cf1D82531c67569197B),                 //IMakerOracle _makerOracle,
             IChainLinkPriceOracle(0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9),        //_daiUsdOracle
             IChainLinkPriceOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419));         //_ethUsdOracle
 
@@ -1317,7 +1314,7 @@ contract DeployMainnetDEth
 
             0xB7c6bB064620270F8c1daA7502bCca75fC074CF4,                 //_initialRecipient
             
-            0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419,                 //_dsGuardFactory
+            0x5a15566417e6C1c9546523066500bDDBc53F88C7,                 //_dsGuardFactory
             0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553);                //_foundryTreasury)
 
         emit LogContracts(oracle, mainnetDeth);
