@@ -2,7 +2,7 @@ pragma solidity ^0.5.0;
 
 import "./dETH.sol";
 
-contract DeployMainnetDEth 
+contract DeployMainnet_dEth 
 {
     event LogContracts(Oracle _oracle, dEth _dEth);
 
