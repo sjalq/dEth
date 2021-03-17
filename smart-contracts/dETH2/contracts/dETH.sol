@@ -104,9 +104,9 @@ contract Oracle
         (,int chainlinkDaiUsdPrice,,,) = daiUsdOracle.latestRoundData();
 
         // chainlink's price comes back as a decimal with 8 places
-        // we need to remove the 8 decimal places added my uint mul, then add 2 places to convert it to a "WAD" type
-        // therefore ".div(10**6)"
-        uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).div(10**6);
+        // multiplying two of them, produces 16 places
+        // we need it in the WAD format which has 18, therefore .mul(10**2) at the end
+        uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).mul(10**2);
     
         // if the differnce between the ethdai price from chainlink is more than 10% different from the
         // maker oracle price, trust the maker oracle 
@@ -127,7 +127,7 @@ contract Oracle
     }
 }
 
-contract dETH is 
+contract dEth is 
     Context, 
     ERC20Detailed, 
     ERC20,
@@ -152,9 +152,6 @@ contract dETH is
     Oracle public oracle;
 
     // automation variables
-    uint public repaymentRatio;
-    uint public targetRatio;
-    uint public boostRatio;
     uint public minRedemptionRatio;
     uint public automationFeePerc;
     
@@ -422,6 +419,9 @@ contract dETH is
             uint _minRedemptionRatio,
             uint _automationFeePerc);
 
+    // note: all values used by defisaver are in WAD format
+    // we do not need that level of precision on this method
+    // so for simplicity and readability they are all set in discrete percentages here
     function automate(
             uint _repaymentRatio,
             uint _targetRatio,
@@ -445,28 +445,25 @@ contract dETH is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
-        repaymentRatio = _repaymentRatio;
-        targetRatio = _targetRatio;
-        boostRatio = _boostRatio;
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            repaymentRatio * 10**16, 
-            boostRatio * 10**16,
-            targetRatio * 10**16,
-            targetRatio * 10**16,
+            _repaymentRatio * 10**16, 
+            _boostRatio * 10**16,
+            _targetRatio * 10**16,
+            _targetRatio * 10**16,
             true,
             true,
             subscriptions);
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
 
         emit AutomationSettingsChanged(
-            repaymentRatio,
-            targetRatio,
-            boostRatio,
+            _repaymentRatio,
+            _targetRatio,
+            _boostRatio,
             minRedemptionRatio,
             automationFeePerc);
     }
