@@ -98,6 +98,8 @@ contract Oracle
     {
         // maker's price comes back as a decimal with 18 places
         uint makerEthUsdPrice = uint(makerOracle.read()); 
+
+        // chainlink's price comes back as a decimal with 8 places
         (,int chainlinkEthUsdPrice,,,) = ethUsdOracle.latestRoundData();
         (,int chainlinkDaiUsdPrice,,,) = daiUsdOracle.latestRoundData();
 
@@ -108,7 +110,7 @@ contract Oracle
     
         // if the differnce between the ethdai price from chainlink is more than 10% different from the
         // maker oracle price, trust the maker oracle 
-        uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkDaiUsdPrice))
+        uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkEthDaiPrice))
             .mul(HUNDRED_PERC)
             .div(makerEthUsdPrice);
         return percDiff > ONE_PERC.mul(10) ? 
@@ -228,21 +230,21 @@ contract dETH is
     function getCollateral()
         public
         view
-        returns(uint _price, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
+        returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
-        _price = getCollateralPriceRAY();
+        _priceRAY = getCollateralPriceRAY();
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
-        _collateralDenominatedDebt = rdiv(_debt, _price);
+        _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
 
     function getCollateralPriceRAY()
         public
         view
-        returns (uint _price)
+        returns (uint _priceRAY)
     {
         // we multiply by 10^9 to cast the price to a RAY number as used by the Maker CDP
-        _price = oracle.getEthDaiPrice().mul(10**9);
+        _priceRAY = oracle.getEthDaiPrice().mul(10**9);
     }
 
     function getExcessCollateral()
@@ -270,7 +272,7 @@ contract dETH is
         // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
         // set minRedemptionRatio to an integer value of discrete whole percentages for clarity 
         // and rather just multiply it by 10^9 here so that it is on the same order as getRatio() when comparing the two.
-        _minRatio = DSMath.rdiv(minRedemptionRatio.mul(10**9), 100);
+        _minRatio = rdiv(minRedemptionRatio.mul(10**9), 100);
     }
 
     function calculateIssuanceAmount(uint _suppliedCollateral)
@@ -287,8 +289,8 @@ contract dETH is
         _automationFee = _suppliedCollateral.mul(automationFeePerc).div(HUNDRED_PERC);
         _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee); // _protocolFee goes to the protocol 
         _accreditedCollateral = _actualCollateralAdded.sub(_automationFee); // _automationFee goes to the pool of funds in the cdp to offset gas implications
-        uint tokenSupplyPerc = _accreditedCollateral.mul(HUNDRED_PERC).div(getExcessCollateral());
-        _tokensIssued = totalSupply().mul(tokenSupplyPerc).div(HUNDRED_PERC);
+        uint newTokenSupplyPerc = _accreditedCollateral.mul(HUNDRED_PERC).div(getExcessCollateral());
+        _tokensIssued = totalSupply().mul(newTokenSupplyPerc).div(HUNDRED_PERC);
     }
 
     event Issued(
@@ -352,12 +354,12 @@ contract dETH is
         // for now keep in mind that this function may return values greater than those that 
         // could be executed in one transaction. 
         require(_tokensToRedeem <= totalSupply(), "_tokensToRedeem exceeds totalSupply()");
-        uint tokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
-        uint collateralAffected = getExcessCollateral().mul(tokenSupplyPerc).div(HUNDRED_PERC);
+        uint redeemTokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
+        uint collateralAffected = getExcessCollateral().mul(redeemTokenSupplyPerc).div(HUNDRED_PERC);
         _protocolFee = collateralAffected.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
         _automationFee = collateralAffected.mul(automationFeePerc).div(HUNDRED_PERC);
-        _collateralRedeemed = collateralAffected.sub(_automationFee); // how much capital should go back to the 
-        _collateralReturned = collateralAffected.sub(_protocolFee).sub(_automationFee);
+        _collateralRedeemed = collateralAffected.sub(_automationFee); // how much capital should exit the dEth contract
+        _collateralReturned = collateralAffected.sub(_protocolFee).sub(_automationFee); // how much capital should return to the user
     }
 
     event Redeemed(
@@ -397,7 +399,7 @@ contract dETH is
         // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
         
         (bool payoutSuccess,) = _receiver.call.value(collateralToReturn)("");
-        require(payoutSuccess, "eth payment reverted");
+        require(payoutSuccess, "eth send to receiver reverted");
 
         // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
         // to prevent bites, getRatio() doesn't use oracle but the price set in the MakerCDP system 
@@ -472,7 +474,7 @@ contract dETH is
     function moveVatEthToCDP()
         public
     {
-        // or reference - this function is called on the MakerManager
+        // for reference - this function is called on the MakerManager
         // function wipeAndFreeETH(
         //     address manager,
         //     uint cdp,
