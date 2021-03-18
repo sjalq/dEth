@@ -19,8 +19,6 @@ open Foundry.Contracts.Debug.ContractDefinition
 open System.Threading.Tasks
 open Nethereum.Web3.Accounts
 
-type ABIType = JsonProvider<"../build/contracts/BucketSale.json">
-
 let rnd = Random()
 
 let rec rndRange min max  = 
@@ -179,10 +177,10 @@ type SpecificationAttribute(contractName, functionName, specCode) =
     member _.SpecCode: int = specCode
 
 let useRinkeby = false
-let ganacheURI = "http://localhost:7545"
+let hardhatURI = "http://localhost:8545"
 let rinkebyURI = "https://rinkeby.infura.io/v3/c48bc466281c4fefb3decad63c4fc815"
 let ganacheMnemonic = "join topple vapor pepper sell enter isolate pact syrup shoulder route token"
-let ganachePrivKey = "689eb5e83bdc2ede1bb2d73b44c5315da21e2ce31e7507cd7fbb94caefd180b4"
+let hardhatPrivKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 let rinkebyPrivKey = "5ca35a65adbd49af639a3686d7d438dba1bcef97cf1593cd5dd8fd79ca89fa3c"
 
 let isRinkeby rinkeby notRinkeby =
@@ -191,7 +189,7 @@ let isRinkeby rinkeby notRinkeby =
     | false -> notRinkeby
 
 let ethConn =
-    isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(ganacheURI, ganachePrivKey))
+    isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
 
 let debug = Debug(ethConn)
 
