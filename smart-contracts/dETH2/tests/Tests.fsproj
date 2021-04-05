@@ -10,10 +10,12 @@
     <Compile Include="DTOs/DebugDefinition.fs" />
     <Compile Include="DTOs/TestTokenDefinition.fs" />
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
+    <Compile Include="DTOs/DEthDefinition.fs" />
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="BucketSaleTestBase.fs" />
     <Compile Include="Tests.fs" />
+    <Compile Include="dEth.fs" />
     <!-- <Compile Include="Program.fs" /> -->
   </ItemGroup>
   <ItemGroup>
