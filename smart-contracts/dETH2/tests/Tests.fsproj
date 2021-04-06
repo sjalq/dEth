@@ -10,15 +10,17 @@
     <Compile Include="DTOs/DebugDefinition.fs" />
     <Compile Include="DTOs/TestTokenDefinition.fs" />
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
-    <Compile Include="DTOs/DEthDefinition.fs" />
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="BucketSaleTestBase.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="dEth.fs" />
-    <!-- <Compile Include="Program.fs" /> -->
+    <Compile Include="dEthTests.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FsCheck" Version="2.15.1" />
+    <PackageReference Include="FsCheck.Xunit" Version="2.15.1" />
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
     <!--PackageReference Include="Nethereum.Web3" Version="5.0.101" /-->

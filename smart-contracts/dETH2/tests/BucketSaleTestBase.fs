@@ -60,6 +60,15 @@ let makeBucketSale treasury startOfSale bucketPeriod bucketSupply bucketCount to
     ethConn.TimeTravel timeTravel
     ContractPlug(ethConn, abi, deployTxReceipt.ContractAddress)
 
+let makeDeth gulper proxyCache cdpId makerManager ethGemJoin saverProxy saverProxyActions oracle initialRecipient DSGuardFactory FoundryTreasury =
+    let abi = Abi("../../../../build/contracts/BucketSale.json")
+    
+    let deployTxReceipt =
+        ethConn.DeployContractAsync abi
+            [| gulper; proxyCache; cdpId; makerManager; ethGemJoin; saverProxy; saverProxyActions; oracle; initialRecipient; DSGuardFactory; FoundryTreasury; |]
+        |> runNow
+    ethConn.TimeTravel hours
+    ContractPlug(ethConn, abi, deployTxReceipt.ContractAddress)
 
 let bucketSale = 
     makeBucketSale 

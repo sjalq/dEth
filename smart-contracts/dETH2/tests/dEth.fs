@@ -1,8 +1,17 @@
 module dEth
 
-open Foundry.Contracts.dEth.ContractDefinition
-    
-let changeGulper (state:DEthDeployment) (gulper:string) = 
-    state.Gulper <- gulper // todo redo dethdeployment class to record
-    state
+type address = string
 
+type DethState = {
+    gulper : address;
+    cdpId : bigint;
+    makerManager : address;
+    ethGemJoin : address;
+    saverProxyActions : address;
+    oracle : address;
+    minRedemptionRatio : bigint;
+    automationFeePerc : bigint;
+}
+
+let changeGulper (dethState:DethState) (gulper:address) = 
+    { dethState with gulper = gulper }

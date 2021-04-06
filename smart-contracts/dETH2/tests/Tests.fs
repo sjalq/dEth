@@ -12,23 +12,23 @@ open Foundry.Contracts.Debug.ContractDefinition
 open Nethereum.Hex.HexConvertors.Extensions
 
 
-[<Specification("BucketSale", "misc", 0)>]
-[<Fact>]
-let ``M000 - Can send eth``() =
-    let balance = ethConn.Web3.Eth.GetBalance.SendRequestAsync(ethConn.Account.Address) |> runNow
-    balance.Value |> should greaterThan (bigInt 0UL)
-
-    let transactionInput =
-        TransactionInput
-            ("", EthAddress.Zero, ethConn.Account.Address, hexBigInt 4000000UL, hexBigInt 1000000000UL, hexBigInt 1UL)
-
-    let sendEthTxReceipt =
-        ethConn.Web3.Eth.TransactionManager.SendTransactionAndWaitForReceiptAsync(transactionInput, null) |> runNow
-
-    sendEthTxReceipt |> shouldSucceed
-
-    let balanceAfter = ethConn.Web3.Eth.GetBalance.SendRequestAsync(EthAddress.Zero) |> runNow
-    balanceAfter.Value |> should greaterThan (bigInt 1UL)
+//[<Specification("BucketSale", "misc", 0)>]
+//[<Fact>]
+//let ``M000 - Can send eth``() =
+//    let balance = ethConn.Web3.Eth.GetBalance.SendRequestAsync(ethConn.Account.Address) |> runNow
+//    balance.Value |> should greaterThan (bigInt 0UL)
+//
+//    let transactionInput =
+//        TransactionInput
+//            ("", EthAddress.Zero, ethConn.Account.Address, hexBigInt 4000000UL, hexBigInt 1000000000UL, hexBigInt 1UL)
+//
+//    let sendEthTxReceipt =
+//        ethConn.Web3.Eth.TransactionManager.SendTransactionAndWaitForReceiptAsync(transactionInput, null) |> runNow
+//
+//    sendEthTxReceipt |> shouldSucceed
+//
+//    let balanceAfter = ethConn.Web3.Eth.GetBalance.SendRequestAsync(EthAddress.Zero) |> runNow
+//    balanceAfter.Value |> should greaterThan (bigInt 1UL)
 
 
 // [<Specification("BucketSale", "constructor", 1)>]
@@ -62,7 +62,7 @@ let ``M000 - Can send eth``() =
 //     for param in [0..6] do
 //         let pickParam condition faulty correct = if condition then fst faulty else correct
 //         try 
-//             ethConn.DeployContractAsync abi
+//             <ethConn.DeployContractAsync abi
 //                 [| 
 //                     pickParam (param = 0) faultyTreasury treasury.Address;  
 //                     startOfSale
