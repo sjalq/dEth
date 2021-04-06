@@ -69,7 +69,7 @@ let makeDeth gulper proxyCache cdpId makerManager ethGemJoin saverProxy saverPro
         |> runNow
     ethConn.TimeTravel hours
     ContractPlug(ethConn, abi, deployTxReceipt.ContractAddress)
-
+    
 let bucketSale = 
     makeBucketSale 
         treasury.Address 
@@ -79,8 +79,7 @@ let bucketSale =
         bucketCount 
         FRY.Address 
         DAI.Address
-        (BigInteger(0UL * days))
-    
+        (BigInteger(0UL * days))    
 
 let addFryMinter newMinter =
     let isMinter = FRY.Query "isMinter" [| newMinter |]

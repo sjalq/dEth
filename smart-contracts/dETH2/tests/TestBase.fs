@@ -220,6 +220,10 @@ let makeAccount() =
     let privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
     Account(privateKey);
 
+let makeOracle makerOracle daiUsd ethUsd = 
+    let abi = Abi("../../../../build/contracts/Oracle.json")
+    let tx = ethConn.DeployContractAsync abi [| makerOracle;daiUsd;ethUsd |] |> runNow
+    ContractPlug(ethConn, abi, tx.ContractAddress)
 
 let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger

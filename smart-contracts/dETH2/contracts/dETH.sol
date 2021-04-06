@@ -81,9 +81,9 @@ contract Oracle
     IChainLinkPriceOracle public ethUsdOracle;
 
     constructor (
-            IMakerOracle _makerOracle,
-            IChainLinkPriceOracle _daiUsdOracle,
-            IChainLinkPriceOracle _ethUsdOracle) 
+            IMakerOracle _makerOracle, // 0x81FE72B5A8d1A857d176C3E7d5Bd2679A9B85763
+            IChainLinkPriceOracle _daiUsdOracle, // 0x7663c5790e1ebf04197245d541279d13f3c2f362
+            IChainLinkPriceOracle _ethUsdOracle) // 0xD45727E3D7405C6Ab3B2b3A57474012e1f998483
         public
     {
         makerOracle = _makerOracle;

@@ -19,7 +19,8 @@ open Foundry.Contracts.BucketSale.ContractDefinition
 
 [<EntryPoint>]
 let main _ =
-    //EnterTests.``E6 - Can enter a bucket with no referrer``()
-
-    Console.ReadLine() |> ignore
+    let a = "6C13F5A7A5C1169EAC2435CF8B56AED42B8BBD35"
+    let b = "027D9BBE9055ADF4068D903CF9AB2126F6FF1795"
+    let c = "6B1DFF2D469E1384AC1D41DDDEF656A0AD36BD3F"
+    let isTrue = dEthTests.``inits to provided parameters`` a b c  
     0
