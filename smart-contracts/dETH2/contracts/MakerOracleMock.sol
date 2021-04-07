@@ -6,9 +6,9 @@ contract MakerOracleMock is IMakerOracle
 {
     bytes32 dataConfig;
 
-    function setData(bytes32 data) external
+    function setData(uint256 data) external
     {
-        dataConfig = data;
+        dataConfig = bytes32(data);
     }
 
     function read()

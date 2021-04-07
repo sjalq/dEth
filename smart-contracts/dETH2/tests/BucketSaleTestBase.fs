@@ -8,7 +8,7 @@ open Constants
 open Foundry.Contracts.Debug.ContractDefinition
 
 let makeToken name code receiver supply =
-    let abi = Abi("../../../../build/contracts/TestToken.json")
+    let abi = Abi("../build/contracts/TestToken.json")
 
     let deployTxReceipt =
         ethConn.DeployContractAsync abi

@@ -225,6 +225,14 @@ let makeOracle makerOracle daiUsd ethUsd =
     let tx = ethConn.DeployContractAsync abi [| makerOracle;daiUsd;ethUsd |] |> runNow
     ContractPlug(ethConn, abi, tx.ContractAddress)
 
+let makeParameterlessContract abi =     
+    let deployTxReceipt =
+        ethConn.DeployContractAsync abi
+            [||]
+        |> runNow
+
+    ContractPlug(ethConn, abi, deployTxReceipt.ContractAddress)    
+
 let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger
 let bucketSupply = 50000UL |> BigInteger
