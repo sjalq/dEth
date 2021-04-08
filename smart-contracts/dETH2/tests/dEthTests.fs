@@ -96,6 +96,9 @@ let ``price is correct given source prices within ten percents of one another`` 
     printfn "a:%A b:%A c:%A" a b c
 
     let price = oracleContract.Query<bigint> "getEthDaiPrice" [||]
+
+    printfn "res: %A" price
+
     should equal (toMakerPriceFormatDecimal priceNonMakerDaiEth) price
 
 // let ``state after solidity function call equals to the state after fsharp function call changeGulper`` a = 
