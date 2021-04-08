@@ -89,6 +89,12 @@ let ``price is correct given source prices within ten percents of one another`` 
     daiUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatInt priceDaiUsd|] |> ignore
     ethUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceEthUsd|] |> ignore  
  
+    let a = makerOracle.Query "readUint" [||]
+    let b = daiUsdOracle.Query "latestRoundDataValue" [||]
+    let c = ethUsdOracle.Query "latestRoundDataValue" [||]
+
+    printfn "a:%A b:%A c:%A" a b c
+
     let price = oracleContract.Query<bigint> "getEthDaiPrice" [||]
     should equal (toMakerPriceFormatDecimal priceNonMakerDaiEth) price
 

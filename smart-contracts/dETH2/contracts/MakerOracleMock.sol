@@ -6,7 +6,7 @@ contract MakerOracleMock is IMakerOracle
 {
     bytes32 dataConfig;
 
-    function setData(uint256 data) external
+    function setData(int256 data) external
     {
         dataConfig = bytes32(data);
     }
@@ -17,6 +17,14 @@ contract MakerOracleMock is IMakerOracle
         returns(bytes32)
     {
         return dataConfig;
+    }
+
+    function readUint()
+        public 
+        view 
+        returns(uint)
+    {
+        return uint(dataConfig);
     }
 }
 
@@ -40,5 +48,13 @@ contract ChainLinkPriceOracleMock is IChainLinkPriceOracle
             uint80 answeredInRound)
     {
         return (0, answerConfig, 0, 0, 0);
+    }
+
+    function latestRoundDataValue()
+        external
+        view
+        returns (int256)
+    {
+        return answerConfig;
     }
 }
