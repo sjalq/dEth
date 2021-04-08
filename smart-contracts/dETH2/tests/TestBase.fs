@@ -191,7 +191,7 @@ let isRinkeby rinkeby notRinkeby =
 let ethConn =
     isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
 
-let debug = lazy ( Debug(ethConn) )
+let debug = Debug(ethConn)
 
 let shouldEqualIgnoringCase (a: string) (b: string) =
     let aString = a |> string
@@ -233,7 +233,7 @@ let makeParameterlessContract abi =
 
     ContractPlug(ethConn, abi, deployTxReceipt.ContractAddress)    
 
-//let startOfSale =  debug.BlockTimestamp + BigInteger (1UL * hours)
+let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger
 let bucketSupply = 50000UL |> BigInteger
 let bucketCount = 1250UL |> BigInteger
