@@ -13,8 +13,6 @@
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
-    <Compile Include="BucketSaleTestBase.fs" />
-    <Compile Include="Tests.fs" />
     <Compile Include="dEth.fs" />
     <Compile Include="dEthTests.fs" />
     <Compile Include="Program.fs" />
