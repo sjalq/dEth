@@ -16,6 +16,26 @@ open Nethereum.RPC.Eth.DTOs
 open Nethereum.Contracts.CQS
 open Nethereum.Contracts
 
+[<Event("Log")>]
+type TransferEventDTO() =
+    interface IEventDTO
+        [<Parameter("uint", "makerEthUsdPrice", 1, false)>]
+        member val public makerEthUsdPrice = Unchecked.defaultof<bigint> with get, set
+        [<Parameter("int", "chainlinkEthUsdPrice", 2, false)>]
+        member val public chainlinkEthUsdPrice = Unchecked.defaultof<bigint> with get, set
+        [<Parameter("int", "chainlinkDaiUsdPrice", 3, false)>]
+        member val public chainlinkDaiUsdPrice = Unchecked.defaultof<bigint> with get, set
+        [<Parameter("uint", "chainlinkEthDaiPrice", 4, false)>]
+        member val public chainlinkEthDaiPrice = Unchecked.defaultof<bigint> with get, set
+        [<Parameter("uint", "percDiff", 5, false)>]
+        member val public percDiff = Unchecked.defaultof<bigint> with get, set
+        [<Parameter("uint", "tenPercent", 6, false)>]
+        member val public tenPercent = Unchecked.defaultof<bigint> with get, set
+        [<Parameter("bool", "isGreater", 7)>]
+        member val public IsGreater = Unchecked.defaultof<bool> with get, set
+        [<Parameter("uint", "returnValue", 8)>]
+        member val public ReturnValue = Unchecked.defaultof<BigInteger> with get, set
+
 [<FunctionOutput>]
 type LatestRoundDataOutputDTO() =
     inherit FunctionOutputDTO() 
@@ -95,11 +115,13 @@ let ``price is correct given source prices within ten percents of one another`` 
 
     printfn "a:%A b:%A c:%A" a b c
 
-    let price = oracleContract.Query<bigint> "getEthDaiPrice" [||]
+    //let res = oracleContract.QueryObj<bigint> "getEthDaiPrice" [||]
+    let tx = oracleContract.ExecuteFunction "getEthDaiPrice" [||]
+    let transferEventOutput = tx.DecodeAllEvents<TransferEventDTO>();
 
-    printfn "res: %A" price
+    let json = Newtonsoft.Json.JsonConvert.SerializeObject transferEventOutput
 
-    should equal (toMakerPriceFormatDecimal priceNonMakerDaiEth) price
+    transferEventOutput
 
 // let ``state after solidity function call equals to the state after fsharp function call changeGulper`` a = 
 //     changeGulper a = 

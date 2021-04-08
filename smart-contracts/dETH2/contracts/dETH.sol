@@ -9,17 +9,17 @@ pragma solidity ^0.5.17;
 import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
-import "./DSMath.sol";
-import "./DSProxy.sol";
+//import "./DSMath.sol";
+//import "./DSProxy.sol";
 
-contract IDSGuard is DSAuthority
-{
-    function permit(address src, address dst, bytes32 sig) public;
-}
+// contract IDSGuard is DSAuthority
+// {
+//     function permit(address src, address dst, bytes32 sig) public;
+// }
 
-contract IDSGuardFactory {
-    function newGuard() public returns (IDSGuard guard);
-}
+// contract IDSGuardFactory {
+//     function newGuard() public returns (IDSGuard guard);
+// }
 
 contract IDSProxy
 {
@@ -93,7 +93,7 @@ contract Oracle
 
     function getEthDaiPrice() 
         public
-        view
+        payable
         returns (uint _price)
     {
         // maker's price comes back as a decimal with 18 places
@@ -113,9 +113,16 @@ contract Oracle
         uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkEthDaiPrice))
             .mul(HUNDRED_PERC)
             .div(makerEthUsdPrice);
-        return percDiff > ONE_PERC.mul(10) ? 
+
+        bool isGreater = percDiff > ONE_PERC.mul(10);
+
+        uint returnValue = isGreater ? 
             makerEthUsdPrice :
             chainlinkEthDaiPrice;
+
+        emit Log(makerEthUsdPrice, chainlinkEthUsdPrice, chainlinkDaiUsdPrice, chainlinkEthDaiPrice, percDiff, ONE_PERC.mul(10), isGreater, returnValue);
+
+        return returnValue;        
     }
 
     function absDiff(uint a, uint b)
@@ -125,378 +132,380 @@ contract Oracle
     {
         return a > b ? a - b : b - a;
     }
+    
+    event Log(uint makerEthUsdPrice, int chainlinkEthUsdPrice, int chainlinkDaiUsdPrice, uint chainlinkEthDaiPrice, uint percDiff, uint tenPercent, bool isGreater, uint returnValue);
 }
 
-contract dEth is 
-    Context, 
-    ERC20Detailed, 
-    ERC20,
-    DSMath,
-    DSProxy
-{
-    using SafeMath for uint;
+// contract dEth is 
+//     Context, 
+//     ERC20Detailed, 
+//     ERC20,
+//     DSMath,
+//     DSProxy
+// {
+//     using SafeMath for uint;
 
-    uint constant ONE_PERC = 10**16;                    //   1.0% 
-    uint constant HUNDRED_PERC = 10**18;                // 100.0%
+//     uint constant ONE_PERC = 10**16;                    //   1.0% 
+//     uint constant HUNDRED_PERC = 10**18;                // 100.0%
 
-    uint constant PROTOCOL_FEE_PERC = 9*10**15;         //   0.9%
+//     uint constant PROTOCOL_FEE_PERC = 9*10**15;         //   0.9%
     
-    address payable public gulper;
-    uint public cdpId;
+//     address payable public gulper;
+//     uint public cdpId;
     
-    address public makerManager;
-    address public ethGemJoin;
+//     address public makerManager;
+//     address public ethGemJoin;
 
-    IMCDSaverProxy public saverProxy;
-    address public saverProxyActions;
-    Oracle public oracle;
+//     IMCDSaverProxy public saverProxy;
+//     address public saverProxyActions;
+//     Oracle public oracle;
 
-    // automation variables
-    uint public minRedemptionRatio;
-    uint public automationFeePerc;
+//     // automation variables
+//     uint public minRedemptionRatio;
+//     uint public automationFeePerc;
     
-    constructor(
-            address payable _gulper,
-            address _proxyCache,
-            uint _cdpId,
+//     constructor(
+//             address payable _gulper,
+//             address _proxyCache,
+//             uint _cdpId,
 
-            address _makerManager,
-            address _ethGemJoin,
+//             address _makerManager,
+//             address _ethGemJoin,
             
-            IMCDSaverProxy _saverProxy,
-            address _saverProxyActions,
-            Oracle _oracle,
+//             IMCDSaverProxy _saverProxy,
+//             address _saverProxyActions,
+//             Oracle _oracle,
             
-            address _initialRecipient,
+//             address _initialRecipient,
             
-            address _DSGuardFactory,
-            address _FoundryTreasury)
-        public
-        DSProxy(_proxyCache)
-        ERC20Detailed("Derived Ether", "dEth", 18)
-    {
-        gulper = _gulper;
-        cdpId = _cdpId;
+//             address _DSGuardFactory,
+//             address _FoundryTreasury)
+//         public
+//         DSProxy(_proxyCache)
+//         ERC20Detailed("Derived Ether", "dEth", 18)
+//     {
+//         gulper = _gulper;
+//         cdpId = _cdpId;
 
-        makerManager = _makerManager;
-        ethGemJoin = _ethGemJoin;
-        saverProxy = _saverProxy;
-        saverProxyActions = _saverProxyActions;
-        oracle = _oracle;
-        minRedemptionRatio = 160;
-        automationFeePerc = ONE_PERC;           //   1.0%
+//         makerManager = _makerManager;
+//         ethGemJoin = _ethGemJoin;
+//         saverProxy = _saverProxy;
+//         saverProxyActions = _saverProxyActions;
+//         oracle = _oracle;
+//         minRedemptionRatio = 160;
+//         automationFeePerc = ONE_PERC;           //   1.0%
         
-        _mint(_initialRecipient, getExcessCollateral());
+//         _mint(_initialRecipient, getExcessCollateral());
 
-        // set the relevant authorities to make sure the parameters can be adjusted later on
-        IDSGuard guard = IDSGuardFactory(_DSGuardFactory).newGuard();
-        guard.permit(
-            _FoundryTreasury,
-            address(this),
-            bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)")));
-        setAuthority(guard);
+//         // set the relevant authorities to make sure the parameters can be adjusted later on
+//         IDSGuard guard = IDSGuardFactory(_DSGuardFactory).newGuard();
+//         guard.permit(
+//             _FoundryTreasury,
+//             address(this),
+//             bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)")));
+//         setAuthority(guard);
 
-        require(
-            authority.canCall(
-                _FoundryTreasury, 
-                address(this), 
-                bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)"))),
-            "guard setting failed");
-    }
+//         require(
+//             authority.canCall(
+//                 _FoundryTreasury, 
+//                 address(this), 
+//                 bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)"))),
+//             "guard setting failed");
+//     }
 
-    function changeGulper(address payable _newGulper)
-        public
-        auth
-    {
-        gulper = _newGulper;
-    }
+//     function changeGulper(address payable _newGulper)
+//         public
+//         auth
+//     {
+//         gulper = _newGulper;
+//     }
 
-    function giveCDPToDSProxy(address _dsProxy)
-        public
-        auth
-    {
-        bytes memory giveProxyCall = abi.encodeWithSignature(
-            "give(address,uint256,address)", 
-            makerManager, 
-            cdpId, 
-            _dsProxy);
+//     function giveCDPToDSProxy(address _dsProxy)
+//         public
+//         auth
+//     {
+//         bytes memory giveProxyCall = abi.encodeWithSignature(
+//             "give(address,uint256,address)", 
+//             makerManager, 
+//             cdpId, 
+//             _dsProxy);
         
-        IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
-    }
+//         IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
+//     }
 
-    function getCollateral()
-        public
-        view
-        returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
-    {
-        _priceRAY = getCollateralPriceRAY();
-        (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
-        _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
-        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
-    }
+//     function getCollateral()
+//         public
+//         view
+//         returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
+//     {
+//         _priceRAY = getCollateralPriceRAY();
+//         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
+//         _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
+//         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
+//     }
 
-    function getCollateralPriceRAY()
-        public
-        view
-        returns (uint _priceRAY)
-    {
-        // we multiply by 10^9 to cast the price to a RAY number as used by the Maker CDP
-        _priceRAY = oracle.getEthDaiPrice().mul(10**9);
-    }
+//     function getCollateralPriceRAY()
+//         public
+//         view
+//         returns (uint _priceRAY)
+//     {
+//         // we multiply by 10^9 to cast the price to a RAY number as used by the Maker CDP
+//         _priceRAY = oracle.getEthDaiPrice().mul(10**9);
+//     }
 
-    function getExcessCollateral()
-        public
-        view
-        returns(uint _excessCollateral)
-    {
-        (,,,, _excessCollateral) = getCollateral();
-    }
+//     function getExcessCollateral()
+//         public
+//         view
+//         returns(uint _excessCollateral)
+//     {
+//         (,,,, _excessCollateral) = getCollateral();
+//     }
 
-    function getRatio()
-        public
-        view
-        returns(uint _ratio)
-    {
-        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        _ratio = saverProxy.getRatio(cdpId, ilk);
-    }
+//     function getRatio()
+//         public
+//         view
+//         returns(uint _ratio)
+//     {
+//         (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
+//         _ratio = saverProxy.getRatio(cdpId, ilk);
+//     }
 
-    function getMinRedemptionRatio()
-        public
-        view
-        returns(uint _minRatio)
-    {
-        // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
-        // set minRedemptionRatio to an integer value of discrete whole percentages for clarity 
-        // and rather just multiply it by 10^9 here so that it is on the same order as getRatio() when comparing the two.
-        _minRatio = rdiv(minRedemptionRatio.mul(10**9), 100);
-    }
+//     function getMinRedemptionRatio()
+//         public
+//         view
+//         returns(uint _minRatio)
+//     {
+//         // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
+//         // set minRedemptionRatio to an integer value of discrete whole percentages for clarity 
+//         // and rather just multiply it by 10^9 here so that it is on the same order as getRatio() when comparing the two.
+//         _minRatio = rdiv(minRedemptionRatio.mul(10**9), 100);
+//     }
 
-    function calculateIssuanceAmount(uint _suppliedCollateral)
-        public
-        view
-        returns (
-            uint _protocolFee,
-            uint _automationFee,
-            uint _actualCollateralAdded,
-            uint _accreditedCollateral,
-            uint _tokensIssued)
-    {
-        _protocolFee = _suppliedCollateral.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
-        _automationFee = _suppliedCollateral.mul(automationFeePerc).div(HUNDRED_PERC);
-        _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee); // _protocolFee goes to the protocol 
-        _accreditedCollateral = _actualCollateralAdded.sub(_automationFee); // _automationFee goes to the pool of funds in the cdp to offset gas implications
-        uint newTokenSupplyPerc = _accreditedCollateral.mul(HUNDRED_PERC).div(getExcessCollateral());
-        _tokensIssued = totalSupply().mul(newTokenSupplyPerc).div(HUNDRED_PERC);
-    }
+//     function calculateIssuanceAmount(uint _suppliedCollateral)
+//         public
+//         view
+//         returns (
+//             uint _protocolFee,
+//             uint _automationFee,
+//             uint _actualCollateralAdded,
+//             uint _accreditedCollateral,
+//             uint _tokensIssued)
+//     {
+//         _protocolFee = _suppliedCollateral.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
+//         _automationFee = _suppliedCollateral.mul(automationFeePerc).div(HUNDRED_PERC);
+//         _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee); // _protocolFee goes to the protocol 
+//         _accreditedCollateral = _actualCollateralAdded.sub(_automationFee); // _automationFee goes to the pool of funds in the cdp to offset gas implications
+//         uint newTokenSupplyPerc = _accreditedCollateral.mul(HUNDRED_PERC).div(getExcessCollateral());
+//         _tokensIssued = totalSupply().mul(newTokenSupplyPerc).div(HUNDRED_PERC);
+//     }
 
-    event Issued(
-        address _receiver, 
-        uint _suppliedCollateral,
-        uint _protocolFee,
-        uint _automationFee,
-        uint _actualCollateralAdded,
-        uint _accreditedCollateral,
-        uint _tokensIssued);
+//     event Issued(
+//         address _receiver, 
+//         uint _suppliedCollateral,
+//         uint _protocolFee,
+//         uint _automationFee,
+//         uint _actualCollateralAdded,
+//         uint _accreditedCollateral,
+//         uint _tokensIssued);
 
-    function squanderMyEthForWorthlessBeans(address _receiver)
-        payable
-        public
-    { 
-        // Goals:
-        // 1. deposits eth into the vault 
-        // 2. gives the holder a claim on the vault for later withdrawal
+//     function squanderMyEthForWorthlessBeans(address _receiver)
+//         payable
+//         public
+//     { 
+//         // Goals:
+//         // 1. deposits eth into the vault 
+//         // 2. gives the holder a claim on the vault for later withdrawal
 
-        (uint protocolFee, 
-        uint automationFee, 
-        uint collateralToLock, 
-        uint accreditedCollateral, 
-        uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
+//         (uint protocolFee, 
+//         uint automationFee, 
+//         uint collateralToLock, 
+//         uint accreditedCollateral, 
+//         uint tokensToIssue)  = calculateIssuanceAmount(msg.value);
 
-        bytes memory lockETHproxyCall = abi.encodeWithSignature(
-            "lockETH(address,address,uint256)", 
-            makerManager, 
-            ethGemJoin,
-            cdpId);
+//         bytes memory lockETHproxyCall = abi.encodeWithSignature(
+//             "lockETH(address,address,uint256)", 
+//             makerManager, 
+//             ethGemJoin,
+//             cdpId);
         
-        IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, lockETHproxyCall);
+//         IDSProxy(address(this)).execute.value(collateralToLock)(saverProxyActions, lockETHproxyCall);
         
-        (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
-        require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
+//         (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
+//         require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
 
-        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
+//         // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
 
-        _mint(_receiver, tokensToIssue);
+//         _mint(_receiver, tokensToIssue);
         
-        emit Issued(
-            _receiver, 
-            msg.value, 
-            protocolFee,
-            automationFee, 
-            collateralToLock, 
-            accreditedCollateral,
-            tokensToIssue);
-    }
+//         emit Issued(
+//             _receiver, 
+//             msg.value, 
+//             protocolFee,
+//             automationFee, 
+//             collateralToLock, 
+//             accreditedCollateral,
+//             tokensToIssue);
+//     }
 
-    function calculateRedemptionValue(uint _tokensToRedeem)
-        public
-        view
-        returns (
-            uint _protocolFee,
-            uint _automationFee,
-            uint _collateralRedeemed, 
-            uint _collateralReturned)
-    {
-        // comment: a full check against the minimum ratio might be added in a future version
-        // for now keep in mind that this function may return values greater than those that 
-        // could be executed in one transaction. 
-        require(_tokensToRedeem <= totalSupply(), "_tokensToRedeem exceeds totalSupply()");
-        uint redeemTokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
-        uint collateralAffected = getExcessCollateral().mul(redeemTokenSupplyPerc).div(HUNDRED_PERC);
-        _protocolFee = collateralAffected.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
-        _automationFee = collateralAffected.mul(automationFeePerc).div(HUNDRED_PERC);
-        _collateralRedeemed = collateralAffected.sub(_automationFee); // how much capital should exit the dEth contract
-        _collateralReturned = collateralAffected.sub(_protocolFee).sub(_automationFee); // how much capital should return to the user
-    }
+//     function calculateRedemptionValue(uint _tokensToRedeem)
+//         public
+//         view
+//         returns (
+//             uint _protocolFee,
+//             uint _automationFee,
+//             uint _collateralRedeemed, 
+//             uint _collateralReturned)
+//     {
+//         // comment: a full check against the minimum ratio might be added in a future version
+//         // for now keep in mind that this function may return values greater than those that 
+//         // could be executed in one transaction. 
+//         require(_tokensToRedeem <= totalSupply(), "_tokensToRedeem exceeds totalSupply()");
+//         uint redeemTokenSupplyPerc = _tokensToRedeem.mul(HUNDRED_PERC).div(totalSupply());
+//         uint collateralAffected = getExcessCollateral().mul(redeemTokenSupplyPerc).div(HUNDRED_PERC);
+//         _protocolFee = collateralAffected.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
+//         _automationFee = collateralAffected.mul(automationFeePerc).div(HUNDRED_PERC);
+//         _collateralRedeemed = collateralAffected.sub(_automationFee); // how much capital should exit the dEth contract
+//         _collateralReturned = collateralAffected.sub(_protocolFee).sub(_automationFee); // how much capital should return to the user
+//     }
 
-    event Redeemed(
-        address _redeemer,
-        address _receiver, 
-        uint _tokensRedeemed,
-        uint _protocolFee,
-        uint _automationFee,
-        uint _collateralRedeemed,
-        uint _collateralReturned);
+//     event Redeemed(
+//         address _redeemer,
+//         address _receiver, 
+//         uint _tokensRedeemed,
+//         uint _protocolFee,
+//         uint _automationFee,
+//         uint _collateralRedeemed,
+//         uint _collateralReturned);
 
-    function redeem(address _receiver, uint _tokensToRedeem)
-        public
-    {
-        // Goals:
-        // 1. if the _tokensToRedeem being claimed does not drain the vault to below 160%
-        // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
+//     function redeem(address _receiver, uint _tokensToRedeem)
+//         public
+//     {
+//         // Goals:
+//         // 1. if the _tokensToRedeem being claimed does not drain the vault to below 160%
+//         // 2. pull out the amount of ether the senders' tokens entitle them to and send it to them
 
-        (uint protocolFee, 
-        uint automationFee, 
-        uint collateralToFree,
-        uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
+//         (uint protocolFee, 
+//         uint automationFee, 
+//         uint collateralToFree,
+//         uint collateralToReturn) = calculateRedemptionValue(_tokensToRedeem);
 
-        bytes memory freeETHProxyCall = abi.encodeWithSignature(
-            "freeETH(address,address,uint256,uint256)",
-            makerManager, 
-            ethGemJoin, 
-            cdpId,
-            collateralToFree);
-        IDSProxy(address(this)).execute(saverProxyActions, freeETHProxyCall);
+//         bytes memory freeETHProxyCall = abi.encodeWithSignature(
+//             "freeETH(address,address,uint256,uint256)",
+//             makerManager, 
+//             ethGemJoin, 
+//             cdpId,
+//             collateralToFree);
+//         IDSProxy(address(this)).execute(saverProxyActions, freeETHProxyCall);
 
-        _burn(msg.sender, _tokensToRedeem);
+//         _burn(msg.sender, _tokensToRedeem);
 
-        (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
-        require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
+//         (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
+//         require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
 
-        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
+//         // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
         
-        (bool payoutSuccess,) = _receiver.call.value(collateralToReturn)("");
-        require(payoutSuccess, "eth send to receiver reverted");
+//         (bool payoutSuccess,) = _receiver.call.value(collateralToReturn)("");
+//         require(payoutSuccess, "eth send to receiver reverted");
 
-        // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
-        // to prevent bites, getRatio() doesn't use oracle but the price set in the MakerCDP system 
-        require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
+//         // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
+//         // to prevent bites, getRatio() doesn't use oracle but the price set in the MakerCDP system 
+//         require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
 
-        emit Redeemed(
-            msg.sender,
-            _receiver, 
-            _tokensToRedeem,
-            protocolFee,
-            automationFee,
-            collateralToFree,
-            collateralToReturn);
-    }
+//         emit Redeemed(
+//             msg.sender,
+//             _receiver, 
+//             _tokensToRedeem,
+//             protocolFee,
+//             automationFee,
+//             collateralToFree,
+//             collateralToReturn);
+//     }
     
-    event AutomationSettingsChanged(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
-            uint _minRedemptionRatio,
-            uint _automationFeePerc);
+//     event AutomationSettingsChanged(
+//             uint _repaymentRatio,
+//             uint _targetRatio,
+//             uint _boostRatio,
+//             uint _minRedemptionRatio,
+//             uint _automationFeePerc);
 
-    // note: all values used by defisaver are in WAD format
-    // we do not need that level of precision on this method
-    // so for simplicity and readability they are all set in discrete percentages here
-    function automate(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
-            uint _minRedemptionRatio,
-            uint _automationFeePerc)
-        public
-        auth
-    {
-        // for reference - this function is called on the subscriptionsProxyV2: 
-        // function subscribe(
-        //     uint _cdpId, 
-        //     uint128 _minRatio, 
-        //     uint128 _maxRatio, 
-        //     uint128 _optimalRatioBoost, 
-        //     uint128 _optimalRatioRepay, 
-        //     bool _boostEnabled, 
-        //     bool _nextPriceEnabled, 
-        //     address _subscriptions) 
+//     // note: all values used by defisaver are in WAD format
+//     // we do not need that level of precision on this method
+//     // so for simplicity and readability they are all set in discrete percentages here
+//     function automate(
+//             uint _repaymentRatio,
+//             uint _targetRatio,
+//             uint _boostRatio,
+//             uint _minRedemptionRatio,
+//             uint _automationFeePerc)
+//         public
+//         auth
+//     {
+//         // for reference - this function is called on the subscriptionsProxyV2: 
+//         // function subscribe(
+//         //     uint _cdpId, 
+//         //     uint128 _minRatio, 
+//         //     uint128 _maxRatio, 
+//         //     uint128 _optimalRatioBoost, 
+//         //     uint128 _optimalRatioRepay, 
+//         //     bool _boostEnabled, 
+//         //     bool _nextPriceEnabled, 
+//         //     address _subscriptions) 
 
-        address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
-        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
+//         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
+//         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
-        minRedemptionRatio = _minRedemptionRatio;
-        automationFeePerc = _automationFeePerc;
+//         minRedemptionRatio = _minRedemptionRatio;
+//         automationFeePerc = _automationFeePerc;
 
-        bytes memory subscribeProxyCall = abi.encodeWithSignature(
-            "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
-            cdpId, 
-            _repaymentRatio * 10**16, 
-            _boostRatio * 10**16,
-            _targetRatio * 10**16,
-            _targetRatio * 10**16,
-            true,
-            true,
-            subscriptions);
-        IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
+//         bytes memory subscribeProxyCall = abi.encodeWithSignature(
+//             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
+//             cdpId, 
+//             _repaymentRatio * 10**16, 
+//             _boostRatio * 10**16,
+//             _targetRatio * 10**16,
+//             _targetRatio * 10**16,
+//             true,
+//             true,
+//             subscriptions);
+//         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
 
-        emit AutomationSettingsChanged(
-            _repaymentRatio,
-            _targetRatio,
-            _boostRatio,
-            minRedemptionRatio,
-            automationFeePerc);
-    }
+//         emit AutomationSettingsChanged(
+//             _repaymentRatio,
+//             _targetRatio,
+//             _boostRatio,
+//             minRedemptionRatio,
+//             automationFeePerc);
+//     }
 
-    function moveVatEthToCDP()
-        public
-    {
-        // for reference - this function is called on the MakerManager
-        // function wipeAndFreeETH(
-        //     address manager,
-        //     uint cdp,
-        //     int256 dart, // change in debt, chould be 0
-        //     int256 dink  // change in collateral, should be the entire balance available for the urn owner
-        // )
+//     function moveVatEthToCDP()
+//         public
+//     {
+//         // for reference - this function is called on the MakerManager
+//         // function wipeAndFreeETH(
+//         //     address manager,
+//         //     uint cdp,
+//         //     int256 dart, // change in debt, chould be 0
+//         //     int256 dink  // change in collateral, should be the entire balance available for the urn owner
+//         // )
 
-        // goal :
-        // 1. get the ether in the urn for this cdp, back into the cdp itself
+//         // goal :
+//         // 1. get the ether in the urn for this cdp, back into the cdp itself
 
-        // logic :
-        // *look up the balance of the urn
-        // *frob that value back into the cdp
+//         // logic :
+//         // *look up the balance of the urn
+//         // *frob that value back into the cdp
 
-        uint256 urnBalance = IMakerManager(makerManager).VAT().urns(bytes32(cdpId), address(this));
+//         uint256 urnBalance = IMakerManager(makerManager).VAT().urns(bytes32(cdpId), address(this));
 
-        bytes memory frobProxyCall = abi.encodeWithSignature(
-            "frob(address,uint256,int256,int256)",
-            makerManager,
-            cdpId,
-            0,
-            int256(urnBalance));
+//         bytes memory frobProxyCall = abi.encodeWithSignature(
+//             "frob(address,uint256,int256,int256)",
+//             makerManager,
+//             cdpId,
+//             0,
+//             int256(urnBalance));
 
-        IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
-    }
+//         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
+//     }
     
-    function () external payable { }
-}
+//     function () external payable { }
+// }
