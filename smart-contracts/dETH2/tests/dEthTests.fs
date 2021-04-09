@@ -77,18 +77,26 @@ let toChainLinkPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal
     // this is to allow decimal points
 let toChainLinkPriceFormatInt (a:int) = toChainLinkPriceFormatDecimal <| decimal a
 
-[<Specification("Oracle", "getEthDaiPrice", 0)>]
-[<Property>]
-let ``price is correct given source prices within ten percents of one another`` () = 
-    let priceMaker = 10 // poh
-    let priceDaiUsd = 5 // poh
-    let priceNonMakerDaiEth = (decimal priceMaker + (decimal priceMaker) * 0.1M) // ne poh
-    let priceEthUsd = priceNonMakerDaiEth / decimal priceDaiUsd
-
+let initOracles priceMaker priceDaiUsd priceEthUsd = 
     makerOracle.ExecuteFunction "setData" [|toMakerPriceFormat priceMaker|] |> ignore
     daiUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatInt priceDaiUsd|] |> ignore
-    ethUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceEthUsd|] |> ignore  
- 
+    ethUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceEthUsd|] |> ignore
+
+let initOraclesDefault () =
+    let priceMaker = 10 // poh
+    let priceDaiUsd = 5 // poh
+    let priceNonMakerDaiEth = (decimal priceMaker + (decimal priceMaker) * 0.1M) // ne poh    
+    let priceEthUsd = priceNonMakerDaiEth / decimal priceDaiUsd
+    
+    initOracles priceMaker priceDaiUsd priceEthUsd
+
+    priceMaker, priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
+
+[<Specification("Oracle", "getEthDaiPrice", 0)>]
+[<Property>]
+let ``price is correct given source prices within ten percents of one another`` () =  
+    let (priceMaker, priceDaiUsd, priceNonMakerDaiEth, priceEthUsd) = initOraclesDefault ()
+
     let a = makerOracle.Query "readUint" [||]
     let b = daiUsdOracle.Query "latestRoundDataValue" [||]
     let c = ethUsdOracle.Query "latestRoundDataValue" [||]
@@ -101,5 +109,38 @@ let ``price is correct given source prices within ten percents of one another`` 
 
     should equal (toMakerPriceFormatDecimal priceNonMakerDaiEth) price
 
-// let ``state after solidity function call equals to the state after fsharp function call changeGulper`` a = 
-//     changeGulper a = 
+[<Specification("dEth", "constructor", 0)>]
+[<Property>]
+let ``initializes with correct values and rights assigned`` gulper proxyCache cdpId makerManager ethGemJoin 
+    saverProxyActions initialRecipient foundryTreasury = 
+    let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
+    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dETH.json")
+    let saverProxy = "0xfDa65289b9e84B98c01d5c8B7B2fc6cbBc506a03"
+    let cdpId = bigint 18963
+    initOraclesDefault () |> ignore
+    let contract = makeContract [|gulper;proxyCache;cdpId;makerManager;ethGemJoin;saverProxy;saverProxyActions;oracleContract.Address;initialRecipient;dsGuardFactory;foundryTreasury|] abi
+    
+    // todo mint initialRecipient
+    // ds factory etc - query the address and check the rights for the foundryTreasury
+
+    // todo check the values in the other cotnracts
+    // todo need to check that has access etc.
+    let correctValues = 
+        ("0x" + gulper).icompare (contract.Query<string> "gulper" [||]) &&
+        ("0x" + proxyCache).icompare (contract.Query<string> "cache" [||]) &&
+        cdpId = (contract.Query<bigint> "cdpId" [||]) &&
+        ("0x" + makerManager).icompare (contract.Query<string> "makerManager" [||]) &&
+        ("0x" + ethGemJoin).icompare (contract.Query<string> "ethGemJoin" [||]) &&
+        ("0x" + saverProxy).icompare (contract.Query<string> "saverProxy" [||]) &&
+        ("0x" + saverProxyActions).icompare (contract.Query<string> "saverProxyActions" [||]) &&
+        ("0x" + oracleContract.Address).icompare (contract.Query<string> "oracle" [||])
+    
+    let authorityAddress = contract.Query<string> "authority" [||]
+
+    let authority = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "../build/contracts/DSAuthority.json"), authorityAddress)
+    let functionName = Web3.Sha3("automate(uint256,uint256,uint256,uint256,uint256)")
+    let canCall = authority.Query<bool> "canCall" [|foundryTreasury; contract.Address; functionName |]
+
+    let balanceOfInitialRecipient = contract.Query<bigint> "balanceOf" [|initialRecipient|]
+
+    canCall && correctValues && balanceOfInitialRecipient > BigInteger.Zero

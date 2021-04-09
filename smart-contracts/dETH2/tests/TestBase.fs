@@ -44,7 +44,7 @@ type IAsyncTxSender =
     abstract member SendTxAsync : string -> BigInteger -> string -> Task<TransactionReceipt>
 
 type EthereumConnection(nodeURI: string, privKey: string) =
-    member val public Gas = hexBigInt 4000000UL
+    member val public Gas = hexBigInt 9500000UL
     member val public GasPrice = hexBigInt 1000000000UL
     member val public Account = Accounts.Account(privKey)
     member val public Web3 = Web3(Accounts.Account(privKey), nodeURI)
@@ -220,18 +220,15 @@ let makeAccount() =
     let privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
     Account(privateKey);
 
-let makeOracle makerOracle daiUsd ethUsd = 
-    let abi = Abi("../../../../build/contracts/Oracle.json")
-    let tx = ethConn.DeployContractAsync abi [| makerOracle;daiUsd;ethUsd |] |> runNow
+let makeContract parameters abi =
+    let tx = ethConn.DeployContractAsync abi parameters |> runNow
     ContractPlug(ethConn, abi, tx.ContractAddress)
 
-let makeParameterlessContract abi =     
-    let deployTxReceipt =
-        ethConn.DeployContractAsync abi
-            [||]
-        |> runNow
+let makeParameterlessContract a = makeContract [||] a
 
-    ContractPlug(ethConn, abi, deployTxReceipt.ContractAddress)    
+let makeOracle makerOracle daiUsd ethUsd =
+    let abi = Abi("../../../../build/contracts/Oracle.json")
+    makeContract [| makerOracle;daiUsd;ethUsd |] abi
 
 let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger
