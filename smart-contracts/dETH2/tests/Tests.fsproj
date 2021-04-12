@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp5.0</TargetFramework>
   </PropertyGroup>
@@ -15,6 +15,7 @@
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="dEth.fs" />
+    <Compile Include="dEthTestsBase.fs" />
     <Compile Include="dEthTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
