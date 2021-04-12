@@ -16,6 +16,7 @@ open Nethereum.RPC.Eth.DTOs
 open Nethereum.Contracts.CQS
 open Nethereum.Contracts
 
+// TODO : move this to the DTO folder
 [<FunctionOutput>]
 type LatestRoundDataOutputDTO() =
     inherit FunctionOutputDTO() 
@@ -36,6 +37,10 @@ type System.String with
 
 let hexGenerator = Gen.elements ( [0..15] |> Seq.map (fun i -> i.ToString("X").[0]) )
 
+let makeOracle makerOracle daiUsd ethUsd =
+    let abi = Abi("../../../../build/contracts/Oracle.json")
+    makeContract [| makerOracle;daiUsd;ethUsd |] abi
+
 let addressGenerator =
     gen {
         let! items = Gen.arrayOfLength 40 <| hexGenerator
@@ -49,9 +54,9 @@ type MyGenerators =
 
 do Arb.register<MyGenerators>() |> ignore
 
-let makerOracle = makeParameterlessContract <| Abi(__SOURCE_DIRECTORY__+ "/../build/contracts/MakerOracleMock.json")
-let daiUsdOracle = makeParameterlessContract <| Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ChainLinkPriceOracleMock.json")
-let ethUsdOracle = makeParameterlessContract <| Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ChainLinkPriceOracleMock.json")
+let makerOracle = makeContract [||] <| Abi(__SOURCE_DIRECTORY__+ "/../build/contracts/MakerOracleMock.json")
+let daiUsdOracle = makeContract [||] <| Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ChainLinkPriceOracleMock.json")
+let ethUsdOracle = makeContract [||] <| Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ChainLinkPriceOracleMock.json")
 let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
 
 [<Specification("Oracle", "constructor", 0)>]

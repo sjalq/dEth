@@ -13,3 +13,7 @@ obj/
 smart-contracts/dETH2/contracts/block.json
 node_modules
 package-lock.json
+smart-contracts/dETH2/tests/paket.lock
+smart-contracts/dETH2/tests/launch-remixd.sh
+smart-contracts/dETH2/tests/launch-hardhat.sh
+.DS_Store
