@@ -18,6 +18,7 @@ open Constants
 open Foundry.Contracts.Debug.ContractDefinition
 open System.Threading.Tasks
 open Nethereum.Web3.Accounts
+open System.Threading
 
 let rnd = Random()
 
@@ -45,7 +46,7 @@ type IAsyncTxSender =
 
 type EthereumConnection(nodeURI: string, privKey: string) =
     member val public Gas = hexBigInt 9500000UL
-    member val public GasPrice = hexBigInt 1000000000UL
+    member val public GasPrice = hexBigInt 8000000000UL
     member val public Account = Accounts.Account(privKey)
     member val public Web3 = Web3(Accounts.Account(privKey), nodeURI)
 
@@ -63,13 +64,12 @@ type EthereumConnection(nodeURI: string, privKey: string) =
 
     member this.DeployContractAsync (abi: Abi) (arguments: obj array) =
         this.Web3.Eth.DeployContract.SendRequestAndWaitForReceiptAsync(
-            abi.AbiString, 
-            abi.Bytecode, 
-            this.Account.Address, 
-            this.Gas, this.GasPrice, 
-            hexBigInt 0UL, 
-            null, 
-            arguments)  
+            abi.AbiString,
+            abi.Bytecode,
+            this.Account.Address,
+            this.Gas,
+            null,
+            arguments)
                 
     member this.TimeTravel seconds = 
         this.Web3.Client.SendRequestAsync(method = "evm_increaseTime", paramList = [| seconds |]) 
