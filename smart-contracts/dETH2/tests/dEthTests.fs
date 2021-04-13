@@ -41,11 +41,6 @@ let ``price is correct given source prices within ten percents of one another`` 
 
     should equal (toMakerPriceFormatDecimal priceNonMakerDaiEth) price
 
-[<Specification("dEth", "constructor", 1)>]
-[<Fact>]
-let ``2inistializes with correct values and rights assigned 2`` () = 
-    ()
-
 [<Specification("dEth", "constructor", 0)>]
 [<Fact>]
 let ``initializes with correct values and rights assigned`` () = 
