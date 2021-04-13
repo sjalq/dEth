@@ -44,15 +44,15 @@ let ``price is correct given source prices within ten percents of one another`` 
 [<Specification("dEth", "constructor", 0)>]
 [<Fact>]
 let ``initializes with correct values and rights assigned`` () = 
-    let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7" // address from mainnet
-    let saverProxy = "0xc563ace6facd385cb1f34fa723f412cc64e63d47" // address from mainnet
-    let gulper = "0x98d619675b9e1441f2b87e6d7638eaedbf6e15fb" // random addresses
-    let proxyCache = "0x271293c67e2d3140a0e9381eff1f9b01e07b0795"
+    let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
+    let saverProxy = "0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47"
+    let gulper = "0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA"
+    let proxyCache = "0x271293c67E2D3140a0E9381EfF1F9b01E07B0795"
     let makerManager = "0x5ef30b9986345249bc32d8928B7ee64DE9435E39"
-    let ethGemJoin = "0x2f0b23f53734252bda2277357e97e1517d6b042a"
-    let saverProxyActions = "0x82ecd135dce65fbc6dbdd0e4237e0af93ffd5038"
-    let initialRecipient = makeAccount().Address
-    let foundryTreasury = makeAccount().Address
+    let ethGemJoin = "0x2F0b23f53734252Bda2277357e97e1517d6B042A"
+    let saverProxyActions = "0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038"
+    let initialRecipient = "0xB7c6bB064620270F8c1daA7502bCca75fC074CF4"
+    let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
     let cdpId = bigint 18963 // https://defiexplore.com/cdp/18963
 
     initOraclesDefault 0.1M |> ignore
