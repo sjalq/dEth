@@ -108,7 +108,7 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
 
     member val public Contract = 
         ethConn.Web3.Eth.GetContract(abi.AbiString, address)
-        
+
     member this.Function functionName = 
         this.Contract.GetFunction(functionName)
 

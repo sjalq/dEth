@@ -11,6 +11,7 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./DSMath.sol";
 import "./DSProxy.sol";
+import "./console.sol";
 
 contract IDSGuard is DSAuthority
 {
@@ -186,7 +187,9 @@ contract dEth is
         minRedemptionRatio = 160;
         automationFeePerc = ONE_PERC;           //   1.0%
         
-        _mint(_initialRecipient, getExcessCollateral());
+        uint excess = getExcessCollateral();
+        console.log("Excess colateral: ", excess);
+        _mint(_initialRecipient, excess);
 
         // set the relevant authorities to make sure the parameters can be adjusted later on
         IDSGuard guard = IDSGuardFactory(_DSGuardFactory).newGuard();
@@ -215,12 +218,14 @@ contract dEth is
         public
         auth
     {
+        console.log("0");
         bytes memory giveProxyCall = abi.encodeWithSignature(
             "give(address,uint256,address)", 
             makerManager, 
             cdpId, 
             _dsProxy);
         
+        console.log("1");
         IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
     }
 
@@ -233,6 +238,12 @@ contract dEth is
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
+        console.log("Price RAY: ", _priceRAY);
+        console.log("_totalCollateral: ", _totalCollateral);
+        console.log("_debt: ", _debt);
+        console.log("_collateralDenominatedDebt: ", _collateralDenominatedDebt);
+        console.log("_totalCollateral: ", _totalCollateral);
+        console.log("_excessCollateral: ", _excessCollateral);                        
     }
 
     function getCollateralPriceRAY()

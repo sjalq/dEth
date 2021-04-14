@@ -8,11 +8,37 @@ open System.Numerics
 open dEthTestsBase
 open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Web3.Accounts
-open System
+open Nethereum.ABI.FunctionEncoding.Attributes
 
 type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
+
+[<FunctionOutput>]
+type GetCollateralOutputDTO() =
+    inherit FunctionOutputDTO() 
+        [<Parameter("uint256", "_priceRAY", 1)>]
+        member val public PriceRAY = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("uint256", "_totalCollateral", 2)>]
+        member val public TotalCollateral = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("uint256", "_debt", 3)>]
+        member val public Debt = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("uint256", "_collateralDenominatedDebt", 4)>]
+        member val public CollateralDenominatedDebt = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("uint256", "_excessCollateral", 5)>]
+        member val public ExcessCollateral = Unchecked.defaultof<BigInteger> with get, set
+
+[<FunctionOutput>]
+type GetCdpDetailedInfoOutputDTO() =
+    inherit FunctionOutputDTO() 
+        [<Parameter("uint256", "collateral", 1)>]
+        member val public Collateral = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("uint256", "debt", 2)>]
+        member val public Debt = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("uint256", "price", 3)>]
+        member val public Price = Unchecked.defaultof<BigInteger> with get, set
+        [<Parameter("bytes32", "ilk", 4)>]
+        member val public Ilk = Unchecked.defaultof<byte[]> with get, set
 
 [<Specification("Oracle", "constructor", 0)>]
 [<Fact>]
@@ -98,10 +124,33 @@ let ``dEth - giveCDPToDSProxy - can be called by owner`` () =
     // should not throw | transaction reverted | message
     contract.ExecuteFunction "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] |> ignore
 
-[<Specification("dEth", "giveCDPToDSProxy", 0)>]
+[<Specification("dEth", "giveCDPToDSProxy", 1)>]
 [<Fact>]
 let ``dEth - giveCDPToDSProxy - cannot be called by owner`` () = 
     let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContract ()
         
     let account = Account(hardhatPrivKey2)
     contract.ExecuteFunctionFrom "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] (EthereumConnection(hardhatURI, account.PrivateKey)) |> ignore
+
+let RAY = BigInteger.Pow(bigint 10, 27);
+let rdiv x y = 
+    (x * RAY + y / bigint 2) / y;
+
+[<Specification("dEth", "getCollateral", 0)>]
+[<Fact>]
+let ``dEth - getCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
+    let (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, dsGuardFactory, foundryTreasury, contract) = getDEthContract ()
+    
+    let priceEthDai = (oracleContract.Query<bigint> "getEthDaiPrice") [||]
+    let priceRay = BigInteger.Multiply(BigInteger.Pow(bigint 10, 9), priceEthDai)
+    let cdpDetailedInfoOutput = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/MCDSaverProxy.json"), saverProxy).Query<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
+    let collateralDenominatedDebt = rdiv cdpDetailedInfoOutput.Debt priceRay
+    let excessCollateral = cdpDetailedInfoOutput.Collateral - collateralDenominatedDebt
+
+    let getCollateralOutput = contract.Query<GetCollateralOutputDTO> "getCollateral" [||]
+
+    should equal priceRay getCollateralOutput.PriceRAY
+    should equal cdpDetailedInfoOutput.Collateral getCollateralOutput.TotalCollateral
+    should equal cdpDetailedInfoOutput.Debt getCollateralOutput.Debt
+    should equal collateralDenominatedDebt getCollateralOutput.CollateralDenominatedDebt
+    should equal excessCollateral getCollateralOutput.ExcessCollateral
