@@ -9,6 +9,7 @@ open dEthTestsBase
 open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Web3.Accounts
 open Nethereum.ABI.FunctionEncoding.Attributes
+open Nethereum.JsonRpc.Client
 
 type System.String with
    member s1.icompare(s2: string) =
@@ -111,16 +112,20 @@ let ``cannot be changed by non-owner`` () =
     try
         contract.ExecuteFunctionFrom "changeGulper" [|account.Address|] (EthereumConnection(hardhatURI, account.PrivateKey)) |> ignore
         should equal oldGulper (contract.Query<string> "gulper" [||])
-    with 
-    | a -> 
+    with
+    | a ->
         match a.InnerException with
         | :? Nethereum.JsonRpc.Client.RpcResponseException -> ()
         | a -> raise a
 
 [<Specification("dEth", "giveCDPToDSProxy", 0)>]
 [<Fact>]
-let ``dEth - giveCDPToDSProxy - can be called by owner`` () = 
+let ``dEth - giveCDPToDSProxy - can be called by owner`` () =
     let (_, _, _, _, _, _, _, _, _, _, _, newContract) = getDEthContract ()
+
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"))
+        |> Async.AwaitTask |> Async.RunSynchronously
+
     // should not throw | transaction reverted | message
     let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
     let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")
@@ -129,15 +134,15 @@ let ``dEth - giveCDPToDSProxy - can be called by owner`` () =
 
 [<Specification("dEth", "giveCDPToDSProxy", 1)>]
 [<Fact>]
-let ``dEth - giveCDPToDSProxy - cannot be called by owner`` () = 
+let ``dEth - giveCDPToDSProxy - cannot be called by owner`` () =
     let (_, _, _, _, _, _, _, _, _, _, _, newContract) = getDEthContract ()
-    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")    
-    let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")        
+    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
+    let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")
     let account = Account(hardhatPrivKey2)
     oldContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] (EthereumConnection(hardhatURI, account.PrivateKey)) |> ignore
 
 let RAY = BigInteger.Pow(bigint 10, 27);
-let rdiv x y = 
+let rdiv x y =
     (x * RAY + y / bigint 2) / y;
 
 [<Specification("dEth", "getCollateral", 0)>]
