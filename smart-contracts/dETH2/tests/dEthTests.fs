@@ -54,9 +54,12 @@ let ``inits to provided parameters`` () =
     shouldEqualIgnoringCase ethUsdOracle (contract.Query<string> "ethUsdOracle" [||])
 
 [<Specification("Oracle", "getEthDaiPrice", 0)>]
-[<Fact>]
-let ``price is correct given source prices within ten percents of one another`` () =
-    let (_, _, priceNonMakerDaiEth, _) = initOraclesDefault 0.1M
+[<Theory>]
+[<InlineData(0.08)>]
+[<InlineData(0.1)>]
+[<InlineData(0.12)>]
+let ``price is correct given source prices within ten percents of one another`` differencePercent =
+    let (priceMaker, priceDaiUsd, priceNonMakerDaiEth, priceEthUsd) = initOraclesDefault differencePercent
 
     let a = makerOracle.Query "readUint" [||]
     let b = daiUsdOracle.Query "latestRoundDataValue" [||]
@@ -68,7 +71,9 @@ let ``price is correct given source prices within ten percents of one another`` 
 
     printfn "res: %A" price
 
-    should equal (toMakerPriceFormatDecimal priceNonMakerDaiEth) price
+    let expected = if differencePercent <= 0.1M then toMakerPriceFormatDecimal priceNonMakerDaiEth else toMakerPriceFormatDecimal priceMaker
+
+    should equal expected price
 
 [<Specification("dEth", "constructor", 0)>]
 [<Fact>]
@@ -115,7 +120,7 @@ let ``cannot be changed by non-owner`` () =
     with
     | a ->
         match a.InnerException with
-        | :? Nethereum.JsonRpc.Client.RpcResponseException -> ()
+        | :? RpcResponseException -> ()
         | a -> raise a
 
 [<Specification("dEth", "giveCDPToDSProxy", 0)>]
@@ -130,7 +135,7 @@ let ``dEth - giveCDPToDSProxy - can be called by owner`` () =
     let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
     let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")
 
-    oldContract.ExecuteFunction "giveCDPToDSProxy" [|newContract.Address|] |> ignore
+    oldContract.ExecuteFunction "giveCDPToDSProxy" [|"0x02e90d652e187ee0e196d456478e16535cc4383b"|] |> ignore
 
 [<Specification("dEth", "giveCDPToDSProxy", 1)>]
 [<Fact>]
@@ -152,14 +157,45 @@ let ``dEth - getCollateral - returns similar values as those directly retrieved 
     
     let priceEthDai = (oracleContract.Query<bigint> "getEthDaiPrice") [||]
     let priceRay = BigInteger.Multiply(BigInteger.Pow(bigint 10, 9), priceEthDai)
-    let cdpDetailedInfoOutput = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/MCDSaverProxy.json"), saverProxy).Query<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
+    let cdpDetailedInfoOutput = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/MCDSaverProxy.json"), saverProxy).QueryObj<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
     let collateralDenominatedDebt = rdiv cdpDetailedInfoOutput.Debt priceRay
     let excessCollateral = cdpDetailedInfoOutput.Collateral - collateralDenominatedDebt
 
-    let getCollateralOutput = contract.Query<GetCollateralOutputDTO> "getCollateral" [||]
+    let getCollateralOutput = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
 
     should equal priceRay getCollateralOutput.PriceRAY
     should equal cdpDetailedInfoOutput.Collateral getCollateralOutput.TotalCollateral
     should equal cdpDetailedInfoOutput.Debt getCollateralOutput.Debt
     should equal collateralDenominatedDebt getCollateralOutput.CollateralDenominatedDebt
     should equal excessCollateral getCollateralOutput.ExcessCollateral
+
+[<Specification("dEth", "getCollateralPriceRAY", 0)>]
+[<Fact>]
+let ``dEth - getCollateralPriceRAY - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
+    let (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, dsGuardFactory, foundryTreasury, contract) = getDEthContract ()
+
+    let ethDaiPrice = oracleContract.Query<bigint> "getEthDaiPrice" [||]
+    let expectedRay = BigInteger.Pow(bigint 10, 9) * ethDaiPrice
+
+    let actualRay = contract.Query<bigint> "getCollateralPriceRAY" [||]
+    should equal expectedRay actualRay
+
+[<Specification("dEth", "getExcessCollateral", 0)>]
+[<Fact>]
+let ``dEth - getExcessCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
+    let (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, dsGuardFactory, foundryTreasury, contract) = getDEthContract ()
+    let collateral = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
+    let expected = collateral.ExcessCollateral
+    let actual = contract.Query<bigint> "getExcessCollateral" [||]
+    should equal expected actual
+
+[<Specification("dEth", "getRatio", 0)>]
+[<Fact>]
+let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
+    let (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, dsGuardFactory, foundryTreasury, contract) = getDEthContract ()
+    let saverProxyContract = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/MCDSaverProxy.json"), saverProxy)
+    let cdpDetailedInfoOutput = saverProxyContract.QueryObj<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
+    let expected = saverProxyContract.Query<bigint> "getRatio" [|cdpId; cdpDetailedInfoOutput.Ilk|]
+    let actual = contract.Query<bigint> "getRatio" [||]
+
+    should equal expected actual

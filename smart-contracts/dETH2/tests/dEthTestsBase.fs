@@ -23,7 +23,7 @@ let toChainLinkPriceFormatInt (a:int) = toChainLinkPriceFormatDecimal <| decimal
 
 let initOracles priceMaker priceDaiUsd priceEthUsd = 
     makerOracle.ExecuteFunction "setData" [|toMakerPriceFormat priceMaker|] |> ignore
-    daiUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatInt priceDaiUsd|] |> ignore
+    daiUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceDaiUsd|] |> ignore
     ethUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceEthUsd|] |> ignore
 
 // percent is normalized to range [0, 1]
@@ -33,9 +33,9 @@ let initOraclesDefault percentDiffNormalized =
     let priceNonMakerDaiEth = (decimal priceMaker + (decimal priceMaker) * percentDiffNormalized)
     let priceEthUsd = priceNonMakerDaiEth / decimal priceDaiUsd
     
-    initOracles priceMaker priceDaiUsd priceEthUsd
+    initOracles (decimal priceMaker) (decimal priceDaiUsd) priceEthUsd
 
-    priceMaker, priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
+    decimal priceMaker, decimal priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
 
 let getDEthContractFromOracle (oracleContract:ContractPlug) = 
     let gulper = "0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA"
