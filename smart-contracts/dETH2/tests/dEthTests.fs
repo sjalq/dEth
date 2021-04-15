@@ -120,17 +120,21 @@ let ``cannot be changed by non-owner`` () =
 [<Specification("dEth", "giveCDPToDSProxy", 0)>]
 [<Fact>]
 let ``dEth - giveCDPToDSProxy - can be called by owner`` () = 
-    let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContract ()
+    let (_, _, _, _, _, _, _, _, _, _, _, newContract) = getDEthContract ()
     // should not throw | transaction reverted | message
-    contract.ExecuteFunction "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] |> ignore
+    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
+    let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")
+
+    oldContract.ExecuteFunction "giveCDPToDSProxy" [|newContract.Address|] |> ignore
 
 [<Specification("dEth", "giveCDPToDSProxy", 1)>]
 [<Fact>]
 let ``dEth - giveCDPToDSProxy - cannot be called by owner`` () = 
-    let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContract ()
-        
+    let (_, _, _, _, _, _, _, _, _, _, _, newContract) = getDEthContract ()
+    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")    
+    let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")        
     let account = Account(hardhatPrivKey2)
-    contract.ExecuteFunctionFrom "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] (EthereumConnection(hardhatURI, account.PrivateKey)) |> ignore
+    oldContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] (EthereumConnection(hardhatURI, account.PrivateKey)) |> ignore
 
 let RAY = BigInteger.Pow(bigint 10, 27);
 let rdiv x y = 
