@@ -1,8 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Ex.fs" />
     <Compile Include="GenericNumber.fs" />
     <Compile Include="Generators.fs" />
     <EmbeddedResource Remove="ContractDefinition\**" />
@@ -13,7 +14,7 @@
     <Compile Include="DTOs/TestTokenDefinition.fs" />
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
     <Compile Include="Constants.fs" />
-    <Compile Include="TestBase.fs" />    
+    <Compile Include="TestBase.fs" />
     <Compile Include="dEthTestsBase.fs" />
     <Compile Include="dEthTests.fs" />
     <Compile Include="Program.fs" />

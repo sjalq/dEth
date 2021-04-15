@@ -3,6 +3,7 @@ module dEthTestsBase
 open TestBase
 open Nethereum.Web3
 open Nethereum.Util
+open System.Numerics
 
 let makeOracle makerOracle daiUsd ethUsd =
     let abi = Abi("../../../../build/contracts/Oracle.json")
@@ -60,3 +61,7 @@ let getDEthContractFromOracle (oracleContract:ContractPlug) =
 let getDEthContract () = 
     let oracleContract = makeOracle "0x729D19f657BD0614b4985Cf1D82531c67569197B" "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9" "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     getDEthContractFromOracle oracleContract
+
+let RAY = BigInteger.Pow(bigint 10, 27);
+let rdiv x y =
+    (x * RAY + y / bigint 2) / y;

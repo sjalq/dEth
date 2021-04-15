@@ -10,6 +10,7 @@ open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Web3.Accounts
 open Nethereum.ABI.FunctionEncoding.Attributes
 open Nethereum.JsonRpc.Client
+open Nethereum.RPC.Eth.DTOs
 
 type System.String with
    member s1.icompare(s2: string) =
@@ -123,32 +124,51 @@ let ``cannot be changed by non-owner`` () =
         | :? RpcResponseException -> ()
         | a -> raise a
 
-[<Specification("dEth", "giveCDPToDSProxy", 0)>]
-[<Fact>]
-let ``dEth - giveCDPToDSProxy - can be called by owner`` () =
+let giveCDPToDSProxyF privKey shouldThrow = 
     let (_, _, _, _, _, _, _, _, _, _, _, newContract) = getDEthContract ()
+    
+    let dEthMainnetOwner = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
+    let dEthMainnet = "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae"
 
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"))
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", dEthMainnetOwner))
         |> Async.AwaitTask |> Async.RunSynchronously
 
-    // should not throw | transaction reverted | message
-    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
-    let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")
+    let addressWithout0x = newContract.Address.Remove(0, 2)
+    let bytesToPad = (32 - addressWithout0x.Length / 2)
+    let paddedAddress = (Array.replicate (bytesToPad * 2) '0' |> System.String) + addressWithout0x
+    let data = Web3.Sha3("giveCDPToDSProxy(address)").Substring(0, 8) + paddedAddress
+    let txInput = new TransactionInput(data, addressTo = dEthMainnet, addressFrom = dEthMainnetOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
+    let txId =  (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> Async.AwaitTask |> Async.RunSynchronously
+    
+    let txReceipt = (Web3(hardhatURI)).Eth.TransactionManager.TransactionReceiptService.PollForReceiptAsync(txId) |> Async.AwaitTask |> Async.RunSynchronously
 
-    oldContract.ExecuteFunction "giveCDPToDSProxy" [|"0x02e90d652e187ee0e196d456478e16535cc4383b"|] |> ignore
+    // return back to the old owner, and also check if we get any errors by calling that
+    
+    try 
+        newContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|dEthMainnet|] (EthereumConnection(hardhatURI, privKey)) |> ignore
+    with 
+    | :? System.AggregateException as aggr -> 
+        
+        // always return the ownership to the old owner to not leave an effect after the test executes
+        try 
+            newContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|dEthMainnet|] (EthereumConnection(hardhatURI, hardhatPrivKey)) |> ignore
+        with _ -> ()
+
+        if not shouldThrow 
+            then Ex.throwPreserve aggr
+        else
+            for inner in aggr.InnerExceptions do
+                match inner with 
+                | :? RpcResponseException as rpcEx -> printfn "eating exception in giveCDPToDSProxyF: %s" rpcEx.Message
+                | _ -> Ex.throwPreserve aggr
+      
+[<Specification("dEth", "giveCDPToDSProxy", 0)>]
+[<Fact>]
+let ``dEth - giveCDPToDSProxy - can be called by owner`` () = giveCDPToDSProxyF hardhatPrivKey false
 
 [<Specification("dEth", "giveCDPToDSProxy", 1)>]
 [<Fact>]
-let ``dEth - giveCDPToDSProxy - cannot be called by owner`` () =
-    let (_, _, _, _, _, _, _, _, _, _, _, newContract) = getDEthContract ()
-    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
-    let oldContract = ContractPlug(ethConn, abi, "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae")
-    let account = Account(hardhatPrivKey2)
-    oldContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|"0x732e0abd062e6bbd7e2a83d345d24f780a2abb06"|] (EthereumConnection(hardhatURI, account.PrivateKey)) |> ignore
-
-let RAY = BigInteger.Pow(bigint 10, 27);
-let rdiv x y =
-    (x * RAY + y / bigint 2) / y;
+let ``dEth - giveCDPToDSProxy - cannot be called by non-owner`` () = giveCDPToDSProxyF hardhatPrivKey2 true
 
 [<Specification("dEth", "getCollateral", 0)>]
 [<Fact>]

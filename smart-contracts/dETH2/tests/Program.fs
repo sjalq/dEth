@@ -19,5 +19,5 @@ open Foundry.Contracts.BucketSale.ContractDefinition
 
 [<EntryPoint>]
 let main _ =
-    dEthTests.``initializes with correct values and rights assigned`` ()
+    let s = dEthTests.``dEth - giveCDPToDSProxy - can be called by owner`` ()
     0
