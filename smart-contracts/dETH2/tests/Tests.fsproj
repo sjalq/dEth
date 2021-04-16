@@ -3,9 +3,6 @@
     <TargetFramework>netcoreapp5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Ex.fs" />
-    <Compile Include="GenericNumber.fs" />
-    <Compile Include="Generators.fs" />
     <EmbeddedResource Remove="ContractDefinition\**" />
   </ItemGroup>
   <ItemGroup>
@@ -13,6 +10,8 @@
     <Compile Include="DTOs/DebugDefinition.fs" />
     <Compile Include="DTOs/TestTokenDefinition.fs" />
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
+    <Compile Include="DTOs/DEthDefinition.fs"/>
+    <Compile Include="DTOs/IMCDSaverProxyDefinition.fs"/>
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="dEthTestsBase.fs" />

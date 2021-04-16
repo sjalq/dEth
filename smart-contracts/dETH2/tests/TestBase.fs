@@ -31,10 +31,13 @@ let rec rndRange min max  =
 let bigInt (value: uint64) = BigInteger(value)
 let hexBigInt (value: uint64) = HexBigInteger(bigInt value)
 
-let runNow (task:Task<'T>) =
+let inline runNow task =
     task
     |> Async.AwaitTask
     |> Async.RunSynchronously
+
+let inline runNowWithoutResult (task:Task) =
+    task |> Async.AwaitTask |> Async.RunSynchronously
 
 type Abi(filename) =
     member val JsonString = File.OpenText(filename).ReadToEnd()
@@ -221,9 +224,18 @@ let makeAccount() =
     let privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
     Account(privateKey);
 
-let makeContract parameters abi =
+let getABI str = Abi(__SOURCE_DIRECTORY__ + (sprintf "/../build/contracts/%s.json" str))
+
+let makeContract parameters contractName =
+    let abi = getABI contractName
     let tx = ethConn.DeployContractAsync abi parameters |> runNow
     ContractPlug(ethConn, abi, tx.ContractAddress)
+
+let padAddress (address:string) = 
+    let addressWithout0x = address.Remove(0, 2)
+    let bytesToPad = (32 - addressWithout0x.Length / 2)
+    
+    (Array.replicate (bytesToPad * 2) '0' |> System.String) + addressWithout0x
 
 let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger

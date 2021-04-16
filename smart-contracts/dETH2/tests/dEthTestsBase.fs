@@ -1,17 +1,20 @@
 module dEthTestsBase
 
 open TestBase
-open Nethereum.Web3
 open Nethereum.Util
 open System.Numerics
 
-let makeOracle makerOracle daiUsd ethUsd =
-    let abi = Abi("../../../../build/contracts/Oracle.json")
-    makeContract [| makerOracle;daiUsd;ethUsd |] abi
+let RAY = BigInteger.Pow(bigint 10, 27);
+let rdiv x y = (x * RAY + y / bigint 2) / y;
 
-let makerOracle = makeContract [||] <| Abi(__SOURCE_DIRECTORY__+ "/../build/contracts/MakerOracleMock.json")
-let daiUsdOracle = makeContract [||] <| Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ChainLinkPriceOracleMock.json")
-let ethUsdOracle = makeContract [||] <| Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ChainLinkPriceOracleMock.json")
+let dEthMainnetOwner = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
+let dEthMainnet = "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae"
+
+let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
+
+let makerOracle = makeContract [||] "MakerOracleMock"
+let daiUsdOracle = makeContract [||] "ChainLinkPriceOracleMock"
+let ethUsdOracle = makeContract [||] "ChainLinkPriceOracleMock"
 let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
 
 // 18 places
@@ -49,19 +52,21 @@ let getDEthContractFromOracle (oracleContract:ContractPlug) =
     let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
     let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
     let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
-
-    let abi = Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/dEth.json")
+    
     let contract = makeContract [|
         gulper;proxyCache;cdpId;makerManager;ethGemJoin;
         saverProxy;saverProxyActions;oracleContract.Address;
-        initialRecipient;dsGuardFactory;foundryTreasury|] abi
+        initialRecipient;dsGuardFactory;foundryTreasury|] "dEth"
 
-    (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, dsGuardFactory, foundryTreasury, contract)
+    let authorityAddress = contract.Query<string> "authority" [||]
+    let authority = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/DSAuthority.json"), authorityAddress)
 
-let getDEthContract () = 
+    (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, foundryTreasury, authority, contract)
+
+let getDEthContractAndFields () = 
     let oracleContract = makeOracle "0x729D19f657BD0614b4985Cf1D82531c67569197B" "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9" "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     getDEthContractFromOracle oracleContract
 
-let RAY = BigInteger.Pow(bigint 10, 27);
-let rdiv x y =
-    (x * RAY + y / bigint 2) / y;
+let getDEthContract () = 
+    let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContractAndFields ()
+    contract
