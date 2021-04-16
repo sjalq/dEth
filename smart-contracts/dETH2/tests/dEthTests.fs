@@ -17,6 +17,9 @@ type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
 
+
+// TODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
+// the constructed oracle itself
 [<Specification("Oracle", "constructor", 0)>]
 [<Fact>]
 let ``inits to provided parameters`` () =
@@ -67,6 +70,8 @@ let ``initializes with correct values and rights assigned`` () =
     should equal true canCall
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
 
+// TODO : any tx that has an event emitted, please ensure that we decode the event and
+// validate that it contains the expected values.
 [<Specification("dEth", "changeGulper", 0)>]
 [<Fact>]
 let ``can be changed by owner`` () =
@@ -88,6 +93,10 @@ let ``cannot be changed by non-owner`` () =
     forwardEvent |> shouldRevertWithUnknownMessage
     shouldEqualIgnoringCase oldGulper <| contract.Query<string> "gulper" [||]
 
+
+// TODO : improve name please
+// otherwise I like this function
+// also please check for expected events. 
 let giveCDPToDSProxyF shouldThrow = 
     let newContract = getDEthContract ()   
 
@@ -159,6 +168,8 @@ let ``dEth - getCollateralPriceRAY - returns similar values as those directly re
     let actualRay = contract.Query<bigint> "getCollateralPriceRAY" [||]
     should equal expectedRay actualRay
 
+
+// TODO : check the notes on the next test
 [<Specification("dEth", "getExcessCollateral", 0)>]
 [<Fact>]
 let ``dEth - getExcessCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
@@ -168,6 +179,12 @@ let ``dEth - getExcessCollateral - returns similar values as those directly retr
     let actual = contract.Query<bigint> "getExcessCollateral" [||]
     should equal expected actual
 
+
+// TODO : This is incorrect in two ways.
+// 1. You need to actually do the calculations very clearly here. 
+// 2. You need to keep in view that the price of Ether differs from what saverProxyContrat uses and our oracle.
+// please redo this one and the one above, checking that the values calculated locally match those returned from our
+// methods, based on the source values. 
 [<Specification("dEth", "getRatio", 0)>]
 [<Fact>]
 let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =

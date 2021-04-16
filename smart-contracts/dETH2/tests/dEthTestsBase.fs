@@ -41,6 +41,9 @@ let initOraclesDefault percentDiffNormalized =
 
     decimal priceMaker, decimal priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
 
+
+// TODO : please do not return such large tuples
+// instead please hoist the addresses into this module as values; IE: dEthTestBase.gulper = "0x..."
 let getDEthContractFromOracle (oracleContract:ContractPlug) = 
     let gulper = "0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA"
     let proxyCache = "0x271293c67E2D3140a0E9381EfF1F9b01E07B0795"
