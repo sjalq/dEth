@@ -10,13 +10,14 @@ open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Web3.Accounts
 open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
-open DETH2.Contracts.IMCDSaverProxy.ContractDefinition
+open Nethereum.Contracts
 open DETH2.Contracts.DEth.ContractDefinition
+open DETH2.Contracts.MCDSaverProxy.ContractDefinition
+open DETH2.Contracts.SaverProxyActions.ContractDefinition
 
 type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
-
 
 // TODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
 // the constructed oracle itself
@@ -70,8 +71,6 @@ let ``initializes with correct values and rights assigned`` () =
     should equal true canCall
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
 
-// TODO : any tx that has an event emitted, please ensure that we decode the event and
-// validate that it contains the expected values.
 [<Specification("dEth", "changeGulper", 0)>]
 [<Fact>]
 let ``can be changed by owner`` () =
@@ -93,19 +92,15 @@ let ``cannot be changed by non-owner`` () =
     forwardEvent |> shouldRevertWithUnknownMessage
     shouldEqualIgnoringCase oldGulper <| contract.Query<string> "gulper" [||]
 
-
-// TODO : improve name please
-// otherwise I like this function
-// also please check for expected events. 
-let giveCDPToDSProxyF shouldThrow = 
-    let newContract = getDEthContract ()   
+let giveCDPToDSProxyTestBase shouldThrow = 
+    let (_, _, cdpId, _, _, _, _, _, _, _, _, newContract) = getDEthContractAndFields ()
 
     // impersonate the owner of cdp owner i.e the owner of deth on mainnet
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", dEthMainnetOwner)) |> runNowWithoutResult
 
     // make a call from impersonated account
     let data = Web3.Sha3("giveCDPToDSProxy(address)").Substring(0, 8) + padAddress newContract.Address
-    let txInput = new TransactionInput(data, addressTo = dEthMainnet, addressFrom = dEthMainnetOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);    
+    let txInput = new TransactionInput(data, addressTo = dEthMainnet, addressFrom = dEthMainnetOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
     (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow |> ignore
   
     // return back to the old owner, and also check if we get any errors by calling that
@@ -116,6 +111,7 @@ let giveCDPToDSProxyF shouldThrow =
         giveCDPToDSProxyReceipt
     
     let giveCDPToDSProxyReceipt = executeGiveCDPFromPrivateKey (if shouldThrow then hardhatPrivKey2 else hardhatPrivKey)
+    let cdpActionEvents = giveCDPToDSProxyReceipt.DecodeAllEvents<CDPActionEventDTO> ()
 
     if shouldThrow
         then
@@ -123,19 +119,22 @@ let giveCDPToDSProxyF shouldThrow =
             executeGiveCDPFromPrivateKey hardhatPrivKey |> ignore
 
             let forwardEvent = debug.DecodeForwardedEvents giveCDPToDSProxyReceipt |> Seq.head
-            shouldRevertWithUnknownMessage forwardEvent
-            
+            shouldRevertWithUnknownMessage forwardEvent            
         else
             shouldSucceed giveCDPToDSProxyReceipt
-
+            should equal 1 cdpActionEvents.Count
+            should equal "give" cdpActionEvents.[0].Event.ReturnValue1
+            should equal cdpId cdpActionEvents.[0].Event.ReturnValue2
+            should equal 0 cdpActionEvents.[0].Event.ReturnValue3
+            should equal 0 cdpActionEvents.[0].Event.ReturnValue4
 
 [<Specification("dEth", "giveCDPToDSProxy", 0)>]
 [<Fact>]
-let ``dEth - giveCDPToDSProxy - can be called by owner`` () = giveCDPToDSProxyF false
+let ``dEth - giveCDPToDSProxy - can be called by owner`` () = giveCDPToDSProxyTestBase false
 
 [<Specification("dEth", "giveCDPToDSProxy", 1)>]
 [<Fact>]
-let ``dEth - giveCDPToDSProxy - cannot be called by non-owner`` () = giveCDPToDSProxyF true
+let ``dEth - giveCDPToDSProxy - cannot be called by non-owner`` () = giveCDPToDSProxyTestBase true
 
 [<Specification("dEth", "getCollateral", 0)>]
 [<Fact>]
@@ -168,30 +167,31 @@ let ``dEth - getCollateralPriceRAY - returns similar values as those directly re
     let actualRay = contract.Query<bigint> "getCollateralPriceRAY" [||]
     should equal expectedRay actualRay
 
-
-// TODO : check the notes on the next test
 [<Specification("dEth", "getExcessCollateral", 0)>]
 [<Fact>]
 let ``dEth - getExcessCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
-    let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContractAndFields ()
-    let collateral = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let expected = collateral.ExcessCollateral
+    let (_, _, cdpId, _, _, saverProxy, _, _, _, _, _, contract) = getDEthContractAndFields ()
+    let saverProxyContract = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/MCDSaverProxy.json"), saverProxy)
+    let getCdpDetailedInfoOutputDTO =  saverProxyContract.QueryObj<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
+    let expected = getCdpDetailedInfoOutputDTO.Collateral - getCdpDetailedInfoOutputDTO.Debt
     let actual = contract.Query<bigint> "getExcessCollateral" [||]
     should equal expected actual
 
-
-// TODO : This is incorrect in two ways.
-// 1. You need to actually do the calculations very clearly here. 
-// 2. You need to keep in view that the price of Ether differs from what saverProxyContrat uses and our oracle.
-// please redo this one and the one above, checking that the values calculated locally match those returned from our
-// methods, based on the source values. 
 [<Specification("dEth", "getRatio", 0)>]
 [<Fact>]
 let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
     let (_, _, cdpId, _, _, saverProxy, _, _, _, _, _, contract) = getDEthContractAndFields ()
     let saverProxyContract = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/MCDSaverProxy.json"), saverProxy)
-    let cdpDetailedInfoOutput = saverProxyContract.QueryObj<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
-    let expected = saverProxyContract.Query<bigint> "getRatio" [|cdpId; cdpDetailedInfoOutput.Ilk|]
+    let manager = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/ManagerLike.json"), "0x5ef30b9986345249bc32d8928B7ee64DE9435E39")
+
+    let ilk = manager.Query<string> "ilks" [|cdpId|]
+    let price = saverProxyContract.Query<bigint> "getPrice" [|ilk|]
+    let getCdpInfoOutputDTO = saverProxyContract.QueryObj<GetCdpInfoOutputDTO> "getCdpInfo" [|manager.Address;cdpId;ilk|]
+
+    let expected = if getCdpInfoOutputDTO.Debt = BigInteger.Zero 
+                            then BigInteger.Zero 
+                            else rdiv (wmul getCdpInfoOutputDTO.Collateral price) getCdpInfoOutputDTO.Debt
+
     let actual = contract.Query<bigint> "getRatio" [||]
 
     should equal expected actual

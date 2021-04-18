@@ -7,6 +7,9 @@ open System.Numerics
 let RAY = BigInteger.Pow(bigint 10, 27);
 let rdiv x y = (x * RAY + y / bigint 2) / y;
 
+let WAD = BigInteger.Pow(bigint 10, 18);
+let wmul x y = ((x * y) + WAD / bigint 2) / WAD 
+
 let dEthMainnetOwner = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
 let dEthMainnet = "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae"
 

@@ -12,6 +12,8 @@
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
     <Compile Include="DTOs/DEthDefinition.fs"/>
     <Compile Include="DTOs/IMCDSaverProxyDefinition.fs"/>
+    <Compile Include="DTOs/MCDSaverProxyDefinition.fs"/>
+    <Compile Include="DTOs/SaverProxyActionsDefinition.fs"/>
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="dEthTestsBase.fs" />
