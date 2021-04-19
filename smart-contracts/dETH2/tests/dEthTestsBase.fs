@@ -3,6 +3,7 @@ module dEthTestsBase
 open TestBase
 open Nethereum.Util
 open System.Numerics
+open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 
 let RAY = BigInteger.Pow(bigint 10, 27);
 let rdiv x y = (x * RAY + y / bigint 2) / y;
@@ -65,7 +66,7 @@ let getDEthContractFromOracle (oracleContract:ContractPlug) =
         initialRecipient;dsGuardFactory;foundryTreasury|] "dEth"
 
     let authorityAddress = contract.Query<string> "authority" [||]
-    let authority = ContractPlug(ethConn, Abi(__SOURCE_DIRECTORY__ + "/../build/contracts/DSAuthority.json"), authorityAddress)
+    let authority = ContractPlug(ethConn, getABI "DSAuthority.json", authorityAddress)
 
     (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, foundryTreasury, authority, contract)
 
@@ -76,3 +77,13 @@ let getDEthContractAndFields () =
 let getDEthContract () = 
     let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContractAndFields ()
     contract
+
+let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProxy (cdpId:bigint) =
+    let priceEthDai = (oracleContract.Query<bigint> "getEthDaiPrice") [||]
+    let priceRay = BigInteger.Multiply(BigInteger.Pow(bigint 10, 9), priceEthDai)
+    let saverProxy = ContractPlug(ethConn, getABI "MCDSaverProxy", saverProxy)
+    let cdpDetailedInfoOutput = saverProxy.QueryObj<GetCdpDetailedInfoOutputDTO> "getCdpDetailedInfo" [|cdpId|]
+    let collateralDenominatedDebt = rdiv cdpDetailedInfoOutput.Debt priceRay
+    let excessCollateral = cdpDetailedInfoOutput.Collateral - collateralDenominatedDebt
+
+    (priceEthDai, priceRay, saverProxy, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral)
