@@ -49,7 +49,7 @@ let ``price is correct given source prices within ten percents of one another`` 
 [<Specification("dEth", "constructor", 0)>]
 [<Fact>]
 let ``initializes with correct values and rights assigned`` () =
-    let (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, foundryTreasury, authority, contract) = getDEthContractAndFields()
+    let authority, contract = getDEthContractAndAuthority()
 
     // check the rights
     let functionName = Web3.Sha3("automate(uint256,uint256,uint256,uint256,uint256)").Substring(0, 8).HexToByteArray()
@@ -65,7 +65,7 @@ let ``initializes with correct values and rights assigned`` () =
     shouldEqualIgnoringCase ethGemJoin (contract.Query<string> "ethGemJoin" [||])
     shouldEqualIgnoringCase saverProxy (contract.Query<string> "saverProxy" [||])
     shouldEqualIgnoringCase saverProxyActions (contract.Query<string> "saverProxyActions" [||])
-    shouldEqualIgnoringCase oracleContract.Address (contract.Query<string> "oracle" [||])
+    shouldEqualIgnoringCase oracleContractMainnet.Address (contract.Query<string> "oracle" [||])
     should equal true canCall
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
 
@@ -91,9 +91,9 @@ let ``cannot be changed by non-owner`` () =
     shouldEqualIgnoringCase oldGulper <| contract.Query<string> "gulper" [||]
 
 let giveCDPToDSProxyTestBase shouldThrow = 
-    let (_, _, cdpId, cdpManager, _, _, _, _, _, _, _, newContract) = getDEthContractAndFields ()
+    let newContract = getDEthContract ()
 
-    let cdpManagerContract = ContractPlug(ethConn, getABI "ManagerLike", cdpManager)
+    let cdpManagerContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
 
     // impersonate the owner of cdp owner i.e the owner of deth on mainnet
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", dEthMainnetOwner)) |> runNowWithoutResult
@@ -134,10 +134,10 @@ let ``dEth - giveCDPToDSProxy - cannot be called by non-owner`` () = giveCDPToDS
 [<Specification("dEth", "getCollateral", 0)>]
 [<Fact>]
 let ``dEth - getCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
-    let (_, _, cdpId, _, _, saverProxy, _, oracleContract, _, _, _, contract) = getDEthContractAndFields ()   
+    let contract = getDEthContract ()
 
     let getCollateralOutput = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let (_, priceRay, _, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral) = getManuallyComputedCollateralValues oracleContract saverProxy cdpId
+    let (_, priceRay, _, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral) = getManuallyComputedCollateralValues oracleContractMainnet saverProxy cdpId
     
     should equal priceRay getCollateralOutput.PriceRAY
     should equal cdpDetailedInfoOutput.Collateral getCollateralOutput.TotalCollateral
@@ -148,9 +148,9 @@ let ``dEth - getCollateral - returns similar values as those directly retrieved 
 [<Specification("dEth", "getCollateralPriceRAY", 0)>]
 [<Fact>]
 let ``dEth - getCollateralPriceRAY - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
-    let (_, _, _, _, _, _, _, oracleContract, _, _, _, contract) = getDEthContractAndFields ()
+    let contract = getDEthContract ()
 
-    let ethDaiPrice = oracleContract.Query<bigint> "getEthDaiPrice" [||]
+    let ethDaiPrice = oracleContractMainnet.Query<bigint> "getEthDaiPrice" [||]
     let expectedRay = BigInteger.Pow(bigint 10, 9) * ethDaiPrice
 
     let actualRay = contract.Query<bigint> "getCollateralPriceRAY" [||]
@@ -159,9 +159,9 @@ let ``dEth - getCollateralPriceRAY - returns similar values as those directly re
 [<Specification("dEth", "getExcessCollateral", 0)>]
 [<Fact>]
 let ``dEth - getExcessCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
-    let (_, _, cdpId, _, _, saverProxy, _, oracleContract, _, _, _, contract) = getDEthContractAndFields ()
+    let contract = getDEthContract ()
 
-    let (_, _, _, _, _, excessCollateral) = getManuallyComputedCollateralValues oracleContract saverProxy cdpId
+    let (_, _, _, _, _, excessCollateral) = getManuallyComputedCollateralValues oracleContractMainnet saverProxy cdpId
 
     let actual = contract.Query<bigint> "getExcessCollateral" [||]
     should equal excessCollateral actual
@@ -169,7 +169,7 @@ let ``dEth - getExcessCollateral - returns similar values as those directly retr
 [<Specification("dEth", "getRatio", 0)>]
 [<Fact>]
 let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
-    let (_, _, cdpId, _, _, saverProxy, _, _, _, _, _, contract) = getDEthContractAndFields ()
+    let contract = getDEthContract ()
     let saverProxyContract = ContractPlug(ethConn, (getABI "MCDSaverProxy"), saverProxy)
     let manager = ContractPlug(ethConn, getABI "ManagerLike", "0x5ef30b9986345249bc32d8928B7ee64DE9435E39")
 

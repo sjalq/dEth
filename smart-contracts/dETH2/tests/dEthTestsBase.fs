@@ -14,12 +14,27 @@ let wmul x y = ((x * y) + WAD / bigint 2) / WAD
 let dEthMainnetOwner = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
 let dEthMainnet = "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae"
 
+let gulper = "0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA"
+let proxyCache = "0x271293c67E2D3140a0E9381EfF1F9b01E07B0795"
+let cdpId = bigint 18963 // https://defiexplore.com/cdp/18963
+let makerManager = "0x5ef30b9986345249bc32d8928B7ee64DE9435E39"
+let ethGemJoin = "0x2F0b23f53734252Bda2277357e97e1517d6B042A"
+let saverProxy = "0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47"
+let saverProxyActions = "0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038"
+let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
+let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
+let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
+
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 
 let makerOracle = makeContract [||] "MakerOracleMock"
 let daiUsdOracle = makeContract [||] "ChainLinkPriceOracleMock"
 let ethUsdOracle = makeContract [||] "ChainLinkPriceOracleMock"
+let makerOracleMainnet = "0x729D19f657BD0614b4985Cf1D82531c67569197B"
+let daiUsdMainnet = "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9"
+let ethUsdMainnet = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
 let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
+let oracleContractMainnet = makeOracle makerOracleMainnet daiUsdMainnet ethUsdMainnet
 
 // 18 places
 let toMakerPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 18.0))).Mantissa
@@ -45,37 +60,22 @@ let initOraclesDefault percentDiffNormalized =
 
     decimal priceMaker, decimal priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
 
-
-// TODO : please do not return such large tuples
-// instead please hoist the addresses into this module as values; IE: dEthTestBase.gulper = "0x..."
-let getDEthContractFromOracle (oracleContract:ContractPlug) = 
-    let gulper = "0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA"
-    let proxyCache = "0x271293c67E2D3140a0E9381EfF1F9b01E07B0795"
-    let cdpId = bigint 18963 // https://defiexplore.com/cdp/18963
-    let makerManager = "0x5ef30b9986345249bc32d8928B7ee64DE9435E39"
-    let ethGemJoin = "0x2F0b23f53734252Bda2277357e97e1517d6B042A"
-    let saverProxy = "0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47"
-    let saverProxyActions = "0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038"
-    let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
-    let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
-    let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
-    
+let getDEthContractFromOracle (oracleContract:ContractPlug) =     
     let contract = makeContract [|
         gulper;proxyCache;cdpId;makerManager;ethGemJoin;
         saverProxy;saverProxyActions;oracleContract.Address;
         initialRecipient;dsGuardFactory;foundryTreasury|] "dEth"
 
     let authorityAddress = contract.Query<string> "authority" [||]
-    let authority = ContractPlug(ethConn, getABI "DSAuthority.json", authorityAddress)
+    let authority = ContractPlug(ethConn, getABI "DSAuthority", authorityAddress)
 
-    (gulper, proxyCache, cdpId, makerManager, ethGemJoin, saverProxy, saverProxyActions, oracleContract, initialRecipient, foundryTreasury, authority, contract)
+    authority, contract
 
-let getDEthContractAndFields () = 
-    let oracleContract = makeOracle "0x729D19f657BD0614b4985Cf1D82531c67569197B" "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9" "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-    getDEthContractFromOracle oracleContract
+let getDEthContractAndAuthority () = 
+    getDEthContractFromOracle oracleContractMainnet
 
 let getDEthContract () = 
-    let (_, _, _, _, _, _, _, _, _, _, _, contract) = getDEthContractAndFields ()
+    let _, contract = getDEthContractAndAuthority ()
     contract
 
 let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProxy (cdpId:bigint) =
