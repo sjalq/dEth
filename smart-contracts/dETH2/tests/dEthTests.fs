@@ -218,24 +218,20 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     // TODO: DRY / find a cleaner way
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", priceFeedOwner)) |> runNowWithoutResult
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", medianOwner)) |> runNowWithoutResult
+
     let abiEncode = new ABIEncode();
     let zzz = (uint debug.BlockTimestamp)  + (uint <| Constants.hours * 3UL)
     let priceFeedArg = PostFunction(Val_ = liquidationPriceFormat, Zzz_ =  zzz, Med_ = makerOracleMainnet)
     let medianArg = PokeFunction(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|zzz|].ToList(), V = [|0|].ToList(), ) // am not sure what V, R, S are
 
-    let result = abiEncode.GetSha3ABIParamsEncodedPacked().ToHex();
-    let data = Web3.Sha3("poke").Substring(0, 8) + result
-    let txInput = new TransactionInput(data, addressTo = dEthMainnet, addressFrom = owner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow |> ignore    
-
-    // for i in 1..next do
-    //     let dsValue = makerOracleMainnetContract.Query<string> "values" [|bigIntToByte12 (bigint 2)|]
-    //     let dsValueContract = ContractPlug(ethConn, getABI "IDSValue", dsValue)
-
-    //     let owner = dsValueContract.Query<string> "owner" [||]
-        
-    //     //let pokeTx = dsValueContract.ExecuteFunction "poke" [|bigIntToByte32 liquidationPriceFormat|]
-    //     ()
+    let priceFeedData = Web3.Sha3("post").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(priceFeedArg).ToHex();
+    let medianData = Web3.Sha3("poke").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(priceFeedArg).ToHex();
+    let medianTxInput = new TransactionInput(medianData, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
+    let priceFeedTxInput = new TransactionInput(priceFeedData, addressTo = priceFeed, addressFrom = priceFeedOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
+   
+    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(medianTxInput) |> runNow |> ignore
+    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(priceFeedTxInput) |> runNow |> ignore
 
     let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
     printfn "currentValue: %A" currentValue
