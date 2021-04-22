@@ -187,12 +187,13 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
     should equal expected actual
 
 let byte12ToInt a = BitConverter.ToInt32( System.ReadOnlySpan(Array.rev a) )
-let intToByte12 (a:int) = 
-    let bytes = BitConverter.GetBytes(a)
-    let paddingArray = Array.init 12 (fun _ -> byte 0)
-    let bytes12 = Array.concat [|bytes;paddingArray|] |> Array.take 12
+let bigintToByte size (a:BigInteger) = 
+    let bytes = a.ToByteArray()
+    let paddingArray = Array.init size (fun _ -> byte 0)
+    let bytes12 = Array.concat [|bytes;paddingArray|] |> Array.take size
     Array.rev bytes12
-    
+let bigIntToByte12 = bigintToByte 12
+let bigIntToByte32 = bigintToByte 32
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
@@ -208,10 +209,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     printfn "next: %A" next
 
     for i in 1..next do
-        let dsValue = makerOracleMainnetContract.Query<string> "values" [|intToByte12 i|]
+        let dsValue = makerOracleMainnetContract.Query<string> "values" [|bigIntToByte12 (bigint i)|]
         let dsValueContract = ContractPlug(ethConn, getABI "IDSValue", dsValue)
 
-        let pokeTx = dsValueContract.ExecuteFunction "poke" [|liquidationPriceFormat|]
+        let pokeTx = dsValueContract.ExecuteFunction "poke" [|bigIntToByte32 liquidationPriceFormat|]
         ()
 
     let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
