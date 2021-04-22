@@ -24,6 +24,7 @@ let saverProxyActions = "0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038"
 let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
 let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
 let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
+let cdpOwner = "0xBA1a28b8c69Bdb92d0c898A0938cd2814dc2cA5A"
 
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 

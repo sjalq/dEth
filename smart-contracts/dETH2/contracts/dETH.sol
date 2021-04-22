@@ -46,8 +46,17 @@ contract IChainLinkPriceOracle
             uint80 answeredInRound);
 }
 
+contract IDSValue
+{
+    function poke(bytes32 wut) public;
+}
+
 contract IMakerOracle
 {
+    mapping (bytes12 => address) public values;
+    mapping (address => bytes12) public indexes;
+    bytes12 public next;
+
     function read()
         public 
         view 
@@ -227,6 +236,7 @@ contract dEth is
         
         console.log("1");
         IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
+        console.log("2");
     }
 
     function getCollateral()

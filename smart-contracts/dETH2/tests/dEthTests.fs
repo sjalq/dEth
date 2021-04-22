@@ -12,6 +12,7 @@ open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
 open DETH2.Contracts.DEth.ContractDefinition
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
+open System
 
 type System.String with
    member s1.icompare(s2: string) =
@@ -171,7 +172,7 @@ let ``dEth - getExcessCollateral - returns similar values as those directly retr
 let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
     let contract = getDEthContract ()
     let saverProxyContract = ContractPlug(ethConn, (getABI "MCDSaverProxy"), saverProxy)
-    let manager = ContractPlug(ethConn, getABI "ManagerLike", "0x5ef30b9986345249bc32d8928B7ee64DE9435E39")
+    let manager = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
 
     let ilk = manager.Query<string> "ilks" [|cdpId|]
     let price = saverProxyContract.Query<bigint> "getPrice" [|ilk|]
@@ -184,3 +185,34 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
     let actual = contract.Query<bigint> "getRatio" [||]
 
     should equal expected actual
+
+let byte12ToInt a = BitConverter.ToInt32( System.ReadOnlySpan(Array.rev a) )
+let intToByte12 (a:int) = 
+    let bytes = BitConverter.GetBytes(a)
+    let paddingArray = Array.init 12 (fun _ -> byte 0)
+    let bytes12 = Array.concat [|bytes;paddingArray|] |> Array.take 12
+    Array.rev bytes12
+    
+
+[<Specification("cdp", "bite", 0)>]
+[<Fact>]
+let ``biting of a CDP - should bite when collateral is < 150`` () = 
+    let liquidationPrice = 14.88M
+    let liquidationPriceFormat = toMakerPriceFormat liquidationPrice
+    let cdpId = 19800
+    let makerOracleMainnetContract = ContractPlug(ethConn, getABI "IMakerOracle", makerOracleMainnet)
+    let nextBytes = makerOracleMainnetContract.Query<byte[]> "next" [||]
+
+    let next = byte12ToInt nextBytes
+
+    printfn "next: %A" next
+
+    for i in 1..next do
+        let dsValue = makerOracleMainnetContract.Query<string> "values" [|intToByte12 i|]
+        let dsValueContract = ContractPlug(ethConn, getABI "IDSValue", dsValue)
+
+        let pokeTx = dsValueContract.ExecuteFunction "poke" [|liquidationPriceFormat|]
+        ()
+
+    let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
+    printfn "currentValue: %A" currentValue
