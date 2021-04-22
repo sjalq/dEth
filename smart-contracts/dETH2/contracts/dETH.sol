@@ -48,7 +48,20 @@ contract IChainLinkPriceOracle
 
 contract IDSValue
 {
+    address public owner;
     function poke(bytes32 wut) public;
+}
+
+contract IPriceFeed
+{
+    function post(uint128 val_, uint32 zzz_, address med_) public;
+}
+
+contract IMedianETHUSD
+{
+    function poke(
+    uint256[] calldata val_, uint256[] calldata age_,
+    uint8[] calldata v, bytes32[] calldata r, bytes32[] calldata s) external;
 }
 
 contract IMakerOracle

@@ -13,7 +13,10 @@ open Nethereum.RPC.Eth.DTOs
 open DETH2.Contracts.DEth.ContractDefinition
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 open System
-
+open System.Linq;
+open Nethereum.ABI
+open DEth.Contracts.IPriceFeed.ContractDefinition
+open DEth.Contracts.IMedianETHUSD.ContractDefinition
 type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
@@ -208,12 +211,31 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     printfn "next: %A" next
 
-    for i in 1..next do
-        let dsValue = makerOracleMainnetContract.Query<string> "values" [|bigIntToByte12 (bigint i)|]
-        let dsValueContract = ContractPlug(ethConn, getABI "IDSValue", dsValue)
+    let median = "0x64de91f5a373cd4c28de3600cb34c7c6ce410c85"
+    let medianOwner = "0xddb108893104de4e1c6d0e47c42237db4e617acc"
+    let priceFeed = "0x20eD77585Be1b2BFD6056C64AEBaD41341E35907"
+    let priceFeedOwner = "0x5e90e067242363be0b4004e1a60b1d877d3d5877"
 
-        let pokeTx = dsValueContract.ExecuteFunction "poke" [|bigIntToByte32 liquidationPriceFormat|]
-        ()
+    // TODO: DRY / find a cleaner way
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", priceFeedOwner)) |> runNowWithoutResult
+    let abiEncode = new ABIEncode();
+    let zzz = (uint debug.BlockTimestamp)  + (uint <| Constants.hours * 3UL)
+    let priceFeedArg = PostFunction(Val_ = liquidationPriceFormat, Zzz_ =  zzz, Med_ = makerOracleMainnet)
+    let medianArg = PokeFunction(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|zzz|].ToList(), V = [|0|].ToList(), ) // am not sure what V, R, S are
+
+    let result = abiEncode.GetSha3ABIParamsEncodedPacked().ToHex();
+    let data = Web3.Sha3("poke").Substring(0, 8) + result
+    let txInput = new TransactionInput(data, addressTo = dEthMainnet, addressFrom = owner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
+    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow |> ignore    
+
+    // for i in 1..next do
+    //     let dsValue = makerOracleMainnetContract.Query<string> "values" [|bigIntToByte12 (bigint 2)|]
+    //     let dsValueContract = ContractPlug(ethConn, getABI "IDSValue", dsValue)
+
+    //     let owner = dsValueContract.Query<string> "owner" [||]
+        
+    //     //let pokeTx = dsValueContract.ExecuteFunction "poke" [|bigIntToByte32 liquidationPriceFormat|]
+    //     ()
 
     let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
     printfn "currentValue: %A" currentValue
