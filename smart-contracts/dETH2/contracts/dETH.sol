@@ -70,6 +70,8 @@ contract IMakerOracle
     mapping (address => bytes12) public indexes;
     bytes12 public next;
 
+    function poke(bytes32 wut) public;
+
     function read()
         public 
         view 
