@@ -34,8 +34,8 @@ let ethUsdOracle = makeContract [||] "ChainLinkPriceOracleMock"
 let makerOracleMainnet = "0x729D19f657BD0614b4985Cf1D82531c67569197B"
 let daiUsdMainnet = "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9"
 let ethUsdMainnet = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
-let oracleContractMainnet = makeOracle makerOracleMainnet daiUsdMainnet ethUsdMainnet
+let oracleContract = ContractPlug(ethConn, getABI "oracle", ethUsdMainnet) // makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
+let oracleContractMainnet = oracleContract;// makeOracle makerOracleMainnet daiUsdMainnet ethUsdMainnet
 
 // 18 places
 let toMakerPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 18.0))).Mantissa

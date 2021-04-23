@@ -50,6 +50,7 @@ contract IDSValue
 {
     address public owner;
     function poke(bytes32 wut) public;
+    function setMin(uint96 min_) public;
 }
 
 contract IPriceFeed
@@ -66,9 +67,11 @@ contract IMedianETHUSD
 
 contract IMakerOracle
 {
-    mapping (bytes12 => address) public values;
-    mapping (address => bytes12) public indexes;
-    bytes12 public next;
+    function unset(bytes12 pos) public;
+    function setNext(bytes12 next_) public;
+    function set(bytes12 pos, address wat) public;
+    function setMin(uint96 min_) public;
+    function poke() public;
 
     function poke(bytes32 wut) public;
 
