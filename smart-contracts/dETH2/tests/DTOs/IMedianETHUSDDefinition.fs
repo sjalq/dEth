@@ -38,7 +38,14 @@ open System.Threading
             member val public R = Unchecked.defaultof<List<byte[]>> with get, set
             [<Parameter("bytes32[]", "s", 5)>]
             member val public S = Unchecked.defaultof<List<byte[]>> with get, set
-        
     
+    [<Function("poke")>]
+    type PokeFunctionWithoutRVS() = 
+        inherit FunctionMessage()
+            [<Parameter("uint256[]", "val_", 1)>]
+            member val public Val_ = Unchecked.defaultof<List<BigInteger>> with get, set
+            [<Parameter("uint256[]", "age_", 2)>]
+            member val public Age_ = Unchecked.defaultof<List<BigInteger>> with get, set
+
 
 

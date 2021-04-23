@@ -1,0 +1,12 @@
+// 1. lock
+// 2. draw
+// 3. reduce 
+
+// take all addresses in medianizer mapping (bytes12 => address) public values;
+
+// then, update these addresses (and impersonate the account that can call them) and call post() on them.
+
+// post(value, ...) to all these price feeds
+
+// then the median should compute() the desired value.
+

@@ -17,9 +17,15 @@ open System.Linq;
 open Nethereum.ABI
 open DEth.Contracts.IPriceFeed.ContractDefinition
 open DEth.Contracts.IMedianETHUSD.ContractDefinition
+open Nethereum.RPC.TransactionManagers
 type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
+
+module Array =
+    let ensureSize size array =
+        let paddingArray = Array.init size (fun _ -> byte 0)
+        Array.concat [|array;paddingArray|] |> Array.take size
 
 // TODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
 // the constructed oracle itself
@@ -192,11 +198,11 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 let byte12ToInt a = BitConverter.ToInt32( System.ReadOnlySpan(Array.rev a) )
 let bigintToByte size (a:BigInteger) = 
     let bytes = a.ToByteArray()
-    let paddingArray = Array.init size (fun _ -> byte 0)
-    let bytes12 = Array.concat [|bytes;paddingArray|] |> Array.take size
-    Array.rev bytes12
+    bytes |> Array.ensureSize size |> Array.rev
 let bigIntToByte12 = bigintToByte 12
 let bigIntToByte32 = bigintToByte 32
+
+let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
@@ -220,15 +226,27 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", priceFeedOwner)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", medianOwner)) |> runNowWithoutResult
 
+    // top up eth on these accounts
+    ethConn.Web3.Eth.GetEtherTransferService().TransferEtherAndWaitForReceiptAsync(medianOwner, 1000M) |> runNow |> ignore
+    ethConn.Web3.Eth.GetEtherTransferService().TransferEtherAndWaitForReceiptAsync(priceFeedOwner, 1000M) |> runNow |> ignore
+
     let abiEncode = new ABIEncode();
     let zzz = (uint debug.BlockTimestamp)  + (uint <| Constants.hours * 3UL)
     let priceFeedArg = PostFunction(Val_ = liquidationPriceFormat, Zzz_ =  zzz, Med_ = makerOracleMainnet)
-    let medianArg = PokeFunction(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|zzz|].ToList(), V = [|0|].ToList(), ) // am not sure what V, R, S are
-
     let priceFeedData = Web3.Sha3("post").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(priceFeedArg).ToHex();
-    let medianData = Web3.Sha3("poke").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(priceFeedArg).ToHex();
-    let medianTxInput = new TransactionInput(medianData, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
     let priceFeedTxInput = new TransactionInput(priceFeedData, addressTo = priceFeed, addressFrom = priceFeedOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
+
+    let medianArgWithouVRS = PokeFunctionWithoutRVS(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|bigint zzz|].ToList())
+    let medianDataWithoutVRS = Web3.Sha3("post").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(medianArgWithouVRS).ToHex();
+    let medianTxInput = new TransactionInput(medianDataWithoutVRS, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);    
+    let medianTxWithoutVRS = ethConn.Web3.Eth.Transactions.SendTransaction.SendRequestAsync(medianTxInput) |> runNow
+    let transactionRpc = ethConn.Web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(medianTxWithoutVRS) |> runNow
+    
+    //Getting the transaction from the chain
+
+    let medianArg = PokeFunction(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|bigint zzz|].ToList(), V = (strToByte32 transactionRpc.V).ToList(), R = [|(strToByte32 transactionRpc.R)|].ToList(), S = [|(strToByte32 transactionRpc.S)|].ToList())
+    let medianData = Web3.Sha3("poke").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(medianArg).ToHex();
+    let medianTxInput = new TransactionInput(medianData, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
    
     (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(medianTxInput) |> runNow |> ignore
     (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(priceFeedTxInput) |> runNow |> ignore
