@@ -17,6 +17,7 @@
     <Compile Include="DTOs/IMedianETHUSDDefinition.fs"/>
     <Compile Include="DTOs/IPriceFeedDefinition.fs"/>
     <Compile Include="DTOs/IMakerOracleAdvancedDefinition.fs"/>
+    <Compile Include="DTOs/DSValueMockDefinition.fs"/>
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="dEthTestsBase.fs" />

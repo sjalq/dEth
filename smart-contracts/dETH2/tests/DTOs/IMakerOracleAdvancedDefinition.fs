@@ -32,7 +32,7 @@ open System.Threading
         
     
     [<Function("set")>]
-    type SetFunction() = 
+    type SetFunction2() =
         inherit FunctionMessage()
     
             [<Parameter("address", "wat", 1)>]
@@ -40,7 +40,7 @@ open System.Threading
         
     
     [<Function("set")>]
-    type SetFunction2() = 
+    type SetFunction() =
         inherit FunctionMessage()
     
             [<Parameter("bytes12", "pos", 1)>]
@@ -66,7 +66,7 @@ open System.Threading
         
     
     [<Function("unset")>]
-    type UnsetFunction() = 
+    type UnsetFunction2() =
         inherit FunctionMessage()
     
             [<Parameter("address", "wat", 1)>]
@@ -74,7 +74,7 @@ open System.Threading
         
     
     [<Function("unset")>]
-    type UnsetFunction2() = 
+    type UnsetFunction() =
         inherit FunctionMessage()
     
             [<Parameter("bytes12", "pos", 1)>]

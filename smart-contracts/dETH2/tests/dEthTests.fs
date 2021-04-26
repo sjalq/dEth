@@ -15,6 +15,8 @@ open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 open System;
 open Nethereum.ABI
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
+open Nethereum.Contracts
+open DEth.Contracts.DSValueMock.ContractDefinition
 
 type System.String with
    member s1.icompare(s2: string) =
@@ -202,12 +204,17 @@ let bigIntToByte32 = bigintToByte 32
 
 let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
 
-let callFunctionWithoutSigning name functionArgs = 
-    let abiEncode = new ABIEncode();
-    let data = Web3.Sha3(name).Substring(0, 8) + abiEncode.GetABIParamsEncoded(functionArgs).ToHex()
-    let txInput = new TransactionInput(data, addressTo = makerOracleMainnet, addressFrom = makerOracleMainnet, gas = hexBigInt 9500000UL, gasPrice = hexBigInt 0UL, value = hexBigInt 0UL);
+let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
+    let txInput = functionArgs.CreateTransactionInput(addressTo)
+    
+    txInput.From <- addressfrom
+    txInput.Gas <- hexBigInt 9500000UL
+    txInput.GasPrice <- hexBigInt 0UL
+    txInput.Value <- hexBigInt 0UL
+
     (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
 
+let callFunctionWithoutSigningMaker (functionArgs:#FunctionMessage) = callFunctionWithoutSigning makerOracleMainnet makerOracleMainnet functionArgs
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
@@ -219,22 +226,26 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     // unset(1 | 2)
     // setNext(2)
-    // function setMin(uint96 min_) - x where x < liquidationPrice
-    // generate mock oracle - function peek() constant returns (bytes32, bool)
-    // set the desired value on it
+    // NOT MANDATORY - function setMin(uint96 min_) - x where x < liquidationPrice
     // set(1, mockOracleAddress)
     // poke()
 
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", makerOracleMainnet)) |> runNowWithoutResult
-    let mockDSValue = makeContract [||] "DSValueMock"
-    mockDSValue.ExecuteFunction "setData" [|liquidationPriceFormatted|] |> ignore
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", (Account(hardhatPrivKey).Address))) |> runNowWithoutResult    
 
-    do callFunctionWithoutSigning "unset" (UnsetFunction2(Pos = bigIntToByte12 (bigint 1))) |> ignore
-    do callFunctionWithoutSigning "unset" (UnsetFunction2(Pos = bigIntToByte12 (bigint 2))) |> ignore
-    do callFunctionWithoutSigning "setNext" (SetNextFunction(Next_ = bigIntToByte12 (bigint 2))) |> ignore
-    do callFunctionWithoutSigning "setMin" (SetMinFunction(Min_ = liquidationPriceFormatted - (liquidationPriceFormatted / bigint 10))) |> ignore
-    do callFunctionWithoutSigning "set" (SetFunction2(Pos = bigIntToByte12 (bigint 1), Wat = mockDSValue.Address)) |> ignore
-    do callFunctionWithoutSigning "poke" <| PokeFunction() |> ignore
+    // generate mock oracle - function peek() constant returns (bytes32, bool)
+    let mockDSValue = makeContract [||] "DSValueMock"
+    // set the desired value on it
+    mockDSValue.ExecuteFunction "setData" [|liquidationPriceFormatted|] |> ignore
+ 
+    do callFunctionWithoutSigning (Account(hardhatPrivKey).Address) mockDSValue.Address <| SetDataFunction(Val = liquidationPriceFormatted) |> ignore
+
+    do callFunctionWithoutSigningMaker (UnsetFunction(Pos = bigIntToByte12 (bigint 1))) |> ignore
+    do callFunctionWithoutSigningMaker (UnsetFunction(Pos = bigIntToByte12 (bigint 2))) |> ignore
+    do callFunctionWithoutSigningMaker (SetNextFunction(Next_ = bigIntToByte12 (bigint 2))) |> ignore
+    //do callFunctionWithoutSigningMaker (SetMinFunction(Min_ = liquidationPriceFormatted - (liquidationPriceFormatted / bigint 10))) |> ignore
+    do callFunctionWithoutSigningMaker (SetFunction(Pos = bigIntToByte12 (bigint 1), Wat = mockDSValue.Address)) |> ignore
+    do callFunctionWithoutSigningMaker <| PokeFunction() |> ignore
 
     let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
     printfn "currentValue: %A" currentValue
