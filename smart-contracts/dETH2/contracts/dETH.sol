@@ -46,13 +46,6 @@ contract IChainLinkPriceOracle
             uint80 answeredInRound);
 }
 
-contract IDSValue
-{
-    address public owner;
-    function poke(bytes32 wut) public;
-    function setMin(uint96 min_) public;
-}
-
 contract IPriceFeed
 {
     function post(uint128 val_, uint32 zzz_, address med_) public;
