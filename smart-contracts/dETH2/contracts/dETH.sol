@@ -67,14 +67,6 @@ contract IMedianETHUSD
 
 contract IMakerOracle
 {
-    function unset(bytes12 pos) public;
-    function setNext(bytes12 next_) public;
-    function set(bytes12 pos, address wat) public;
-    function setMin(uint96 min_) public;
-    function poke() public;
-
-    function poke(bytes32 wut) public;
-
     function read()
         public 
         view 

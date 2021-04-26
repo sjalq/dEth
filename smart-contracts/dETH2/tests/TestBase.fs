@@ -67,11 +67,12 @@ type EthereumConnection(nodeURI: string, privKey: string) =
 
     member this.DeployContractAsync (abi: Abi) (arguments: obj array) =
         this.Web3.Eth.DeployContract.SendRequestAndWaitForReceiptAsync(
-            abi.AbiString,
-            abi.Bytecode,
-            this.Account.Address,
-            this.Gas,
-            null,
+            abi.AbiString, 
+            abi.Bytecode, 
+            this.Account.Address, 
+            this.Gas, this.GasPrice, 
+            hexBigInt 0UL, 
+            null, 
             arguments)
                 
     member this.TimeTravel seconds = 
@@ -89,7 +90,7 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member this.SendEtherAsync address (amount:BigInteger) =
         let transactionInput =
             TransactionInput
-                ("", address, this.Account.Address, hexBigInt 4000000UL, hexBigInt 1000000000UL, HexBigInteger(amount))
+                ("", address, this.Account.Address, hexBigInt 9500000UL, hexBigInt 1000000000UL, HexBigInteger(amount))
         this.Web3.Eth.TransactionManager.SendTransactionAndWaitForReceiptAsync(transactionInput, null)
 
     member this.SendEther address amount =
@@ -172,7 +173,7 @@ type ForwardedEventDTO with
         | true -> None
         | _ -> Some(Encoding.ASCII.GetString(this.ResultData))
 
-[<System.AttributeUsage(AttributeTargets.Method, AllowMultiple = true)>]
+[<AttributeUsage(AttributeTargets.Method, AllowMultiple = true)>]
 type SpecificationAttribute(contractName, functionName, specCode) =
     inherit Attribute()
     member _.ContractName: string = contractName
