@@ -12,11 +12,9 @@ open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
 open DETH2.Contracts.DEth.ContractDefinition
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
-open System
-open System.Linq;
+open System;
 open Nethereum.ABI
-open Nethereum.RPC.TransactionManagers
-open DETH2.Contracts.IMakerOracle.ContractDefinition
+open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
 
 type System.String with
    member s1.icompare(s2: string) =
@@ -207,8 +205,9 @@ let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.
 let callFunctionWithoutSigning name functionArgs = 
     let abiEncode = new ABIEncode();
     let data = Web3.Sha3(name).Substring(0, 8) + abiEncode.GetABIParamsEncoded(functionArgs).ToHex()
-    let txInput = new TransactionInput(data, addressTo = makerOracleMainnet, addressFrom = makerOracleMainnet, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
+    let txInput = new TransactionInput(data, addressTo = makerOracleMainnet, addressFrom = makerOracleMainnet, gas = hexBigInt 9500000UL, gasPrice = hexBigInt 0UL, value = hexBigInt 0UL);
     (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
+
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
@@ -218,75 +217,24 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let cdpId = 19800
     let makerOracleMainnetContract = ContractPlug(ethConn, getABI "IMakerOracle", makerOracleMainnet)
 
-<<<<<<< Updated upstream
-    printfn "next: %A" next
-    // impersonate owner 
-    // call rely
-    //let median = "0x64de91f5a373cd4c28de3600cb34c7c6ce410c85"
-    //let medianOwner = "0xddb108893104de4e1c6d0e47c42237db4e617acc"
-    //let priceFeed = "0x20eD77585Be1b2BFD6056C64AEBaD41341E35907"
-    //let priceFeedOwner = "0x4f95d9b4d842b2e2b1d1ac3f2cf548b93fd77c67"
+    // unset(1 | 2)
+    // setNext(2)
+    // function setMin(uint96 min_) - x where x < liquidationPrice
+    // generate mock oracle - function peek() constant returns (bytes32, bool)
+    // set the desired value on it
+    // set(1, mockOracleAddress)
+    // poke()
 
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", makerOracleMainnet)) |> runNowWithoutResult
+    let mockDSValue = makeContract [||] "DSValueMock"
+    mockDSValue.ExecuteFunction "setData" [|liquidationPriceFormatted|] |> ignore
 
-    // top up eth on these accounts
-    //ethConn.Web3.Eth.GetEtherTransferService().TransferEtherAndWaitForReceiptAsync(medianOwner, 1000M) |> runNow |> ignore
-    //ethConn.Web3.Eth.GetEtherTransferService().TransferEtherAndWaitForReceiptAsync(priceFeedOwner, 1000M) |> runNow |> ignore
-
-    let abiEncode = new ABIEncode();
-    let zzz = (uint debug.BlockTimestamp)  + (uint <| Constants.hours * 3UL)
-    let priceFeedArg = PostFunction(Val_ = liquidationPriceFormat, Zzz_ =  zzz, Med_ = makerOracleMainnet)
-    let priceFeedData = Web3.Sha3("post").Substring(0, 8) + abiEncode.GetABIParamsEncoded(priceFeedArg).ToHex()
-    let priceFeedTxInput = new TransactionInput(priceFeedData, addressTo = priceFeed, addressFrom = priceFeedOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(priceFeedTxInput) |> runNow |> ignore
-=======
-// unset(1 | 2)
-// setNext(2)
-// function setMin(uint96 min_) - x where x < liquidationPrice
-// generate mock oracle - function peek() constant returns (bytes32, bool)
-// set(1, mockOracleAddress)
-// poke()
-
-    // impersonate owner 
-    // call rely
-    
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", makerOracleMainnet)) |> runNowWithoutResult
-
-    do callFunctionWithoutSigning "unset" (UnsetFunction(Pos = (bigIntToByte12 <| bigint 1))) |> ignore
-    do callFunctionWithoutSigning "unset" (UnsetFunction(Pos = (bigIntToByte12 <| bigint 2))) |> ignore
-    do callFunctionWithoutSigning "setNext" (SetNextFunction(Next_ = (bigIntToByte12 <| bigint 2))) |> ignore
+    do callFunctionWithoutSigning "unset" (UnsetFunction2(Pos = bigIntToByte12 (bigint 1))) |> ignore
+    do callFunctionWithoutSigning "unset" (UnsetFunction2(Pos = bigIntToByte12 (bigint 2))) |> ignore
+    do callFunctionWithoutSigning "setNext" (SetNextFunction(Next_ = bigIntToByte12 (bigint 2))) |> ignore
     do callFunctionWithoutSigning "setMin" (SetMinFunction(Min_ = liquidationPriceFormatted - (liquidationPriceFormatted / bigint 10))) |> ignore
-
-    
-
-    //let medianArgWithouVRS = PokeFunctionWithoutRVS(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|bigint zzz|].ToList())
-    //let medianDataWithoutVRS = Web3.Sha3("post").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(medianArgWithouVRS).ToHex();
-    //let medianTxInput = new TransactionInput(medianDataWithoutVRS, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-    //let medianTxWithoutVRS = ethConn.Web3.Eth.Transactions.SendTransaction.SendRequestAsync(medianTxInput) |> runNow
-    //let transactionRpc = ethConn.Web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(medianTxWithoutVRS) |> runNow
-    //
-    ////Getting the transaction from the chain
-//
-    //let medianArg = PokeFunction(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|bigint zzz|].ToList(), V = (strToByte32 transactionRpc.V).ToList(), R = [|(strToByte32 transactionRpc.R)|].ToList(), S = [|(strToByte32 transactionRpc.S)|].ToList())
-    //let medianData = Web3.Sha3("poke").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(medianArg).ToHex();
-    //let medianTxInput = new TransactionInput(medianData, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-   //
-    //(Web3(hardhatURI)).TransactionManager.SendTransactionAsync(medianTxInput) |> runNow |> ignore
->>>>>>> Stashed changes
-
-    //let medianArgWithouVRS = PokeFunctionWithoutRVS(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|bigint zzz|].ToList())
-    //let medianDataWithoutVRS = Web3.Sha3("post").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(medianArgWithouVRS).ToHex();
-    //let medianTxInput = new TransactionInput(medianDataWithoutVRS, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-    //let medianTxWithoutVRS = ethConn.Web3.Eth.Transactions.SendTransaction.SendRequestAsync(medianTxInput) |> runNow
-    //let transactionRpc = ethConn.Web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(medianTxWithoutVRS) |> runNow
-    //
-    ////Getting the transaction from the chain
-//
-    //let medianArg = PokeFunction(Val_ = [|liquidationPriceFormat|].ToList(), Age_ = [|bigint zzz|].ToList(), V = (strToByte32 transactionRpc.V).ToList(), R = [|(strToByte32 transactionRpc.R)|].ToList(), S = [|(strToByte32 transactionRpc.S)|].ToList())
-    //let medianData = Web3.Sha3("poke").Substring(0, 8) + abiEncode.GetSha3ABIParamsEncodedPacked(medianArg).ToHex();
-    //let medianTxInput = new TransactionInput(medianData, addressTo = median, addressFrom = medianOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-   //
-    //(Web3(hardhatURI)).TransactionManager.SendTransactionAsync(medianTxInput) |> runNow |> ignore
+    do callFunctionWithoutSigning "set" (SetFunction2(Pos = bigIntToByte12 (bigint 1), Wat = mockDSValue.Address)) |> ignore
+    do callFunctionWithoutSigning "poke" <| PokeFunction() |> ignore
 
     let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
     printfn "currentValue: %A" currentValue
