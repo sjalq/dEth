@@ -1,0 +1,26 @@
+pragma solidity ^0.5.17;
+
+contract PipLike {
+    function change(address src_) public;
+    function peek() external returns (bytes32, bool);
+}
+
+contract ISpotter {
+
+    struct Ilk {
+        PipLike pip;
+        uint256 mat;
+    }
+
+    mapping (bytes32 => Ilk) public ilks;
+
+    // --- Events ---
+    event Poke(
+      bytes32 ilk,
+      bytes32 val,  // [wad]
+      uint256 spot  // [ray]
+    );
+
+    // --- Update value ---
+    function poke(bytes32 ilk) external;
+}

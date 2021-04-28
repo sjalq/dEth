@@ -18,6 +18,11 @@
     <Compile Include="DTOs/IPriceFeedDefinition.fs"/>
     <Compile Include="DTOs/IMakerOracleAdvancedDefinition.fs"/>
     <Compile Include="DTOs/DSValueMockDefinition.fs"/>
+    <Compile Include="DTOs/CatDefinition.fs"/>
+    <Compile Include="DTOs/IMakerManagerAdvancedDefinition.fs"/>
+    <Compile Include="DTOs/VatLikeDefinition.fs"/>
+    <Compile Include="DTOs/ISpotterDefinition.fs"/>
+    <Compile Include="DTOs/PipLikeDefinition.fs"/>
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="dEthTestsBase.fs" />

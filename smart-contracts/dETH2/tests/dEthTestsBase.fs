@@ -25,6 +25,9 @@ let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
 let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
 let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
 let cdpOwner = "0xBA1a28b8c69Bdb92d0c898A0938cd2814dc2cA5A"
+let cat = "0xa5679c04fc3d9d8b0aab1f0ab83555b301ca70ea" // the contract that bites
+let vat = "0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
+let spot = "0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3"
 
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 

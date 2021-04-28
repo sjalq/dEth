@@ -236,7 +236,7 @@ let padAddress (address:string) =
     let addressWithout0x = address.Remove(0, 2)
     let bytesToPad = (32 - addressWithout0x.Length / 2)
     
-    (Array.replicate (bytesToPad * 2) '0' |> System.String) + addressWithout0x
+    (Array.replicate (bytesToPad * 2) '0' |> String) + addressWithout0x
 
 let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger
