@@ -28,6 +28,8 @@ let cdpOwner = "0xBA1a28b8c69Bdb92d0c898A0938cd2814dc2cA5A"
 let cat = "0xa5679c04fc3d9d8b0aab1f0ab83555b301ca70ea" // the contract that bites
 let vat = "0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
 let spot = "0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3"
+let ilk = "ETH-A"
+let ilkPIPAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 

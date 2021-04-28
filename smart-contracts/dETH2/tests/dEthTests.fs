@@ -230,9 +230,8 @@ let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Arr
 
 let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
         let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> removeFromEnd (byte 0)
-        let ilk = System.Text.Encoding.UTF8.GetString(ilkBytes)
         let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
-        (ilk, urn)
+        (ilkBytes, urn)
 
 let findActiveCDP ilkArg =
     let cdpManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
@@ -244,76 +243,37 @@ let findActiveCDP ilkArg =
     let getInkAndUrnFromCdp = getInkAndUrnFromCdp cdpManagerContract
 
     let cdpId = Seq.findBack (fun cdpId ->
-        let (ilk, urn) = getInkAndUrnFromCdp cdpId
+        let (ilkBytes, urn) = getInkAndUrnFromCdp cdpId
+        let ilk = System.Text.Encoding.UTF8.GetString(ilkBytes)
 
         let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
 
-        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg
-    ) <| cdpIds
+        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg) cdpIds
 
-    res
+    getInkAndUrnFromCdp cdpId
+
+let pokePIP callPip = 
+    do ethConn.TimeTravel <| Constants.hours * 2UL
+    do callPip (PokeFunction()) |> ignore
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () = 
-    let liquidationPrice = 10M
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
 
+    let liquidationPrice = 10M
     let catContract = ContractPlug(ethConn, getABI "ICat", cat)
-    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
     let mockDSValueContract = getMockDSValue liquidationPrice
 
-    let (cdpId, ilk, urn) = findActiveCDP "ETH-A" |> Option.get
-
+    let (ilk, urn) = findActiveCDP ilk
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
-    let pipAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 
-(**)
-    let ilksOutput = vatContract.QueryObj<VatIlksOutputDTO> "ilks" [|ilk|]
-    let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
-    printfn "BEFORE: spot=%A;ink=%A;mul=%A ||| art=%A;rate=%A;mul=%A" ilksOutput.Spot urnsOutput.Ink (ilksOutput.Spot * urnsOutput.Ink) urnsOutput.Art ilksOutput.Rate (urnsOutput.Art * ilksOutput.Rate)
-(**)
-
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", pipAuthority)) |> runNowWithoutResult
-    let callPip (a:#FunctionMessage) = callFunctionWithoutSigning pipAuthority pipAddress a
+    let callPip (a:#FunctionMessage) = callFunctionWithoutSigning ilkPIPAuthority pipAddress a
 
     do callPip (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
-    do ethConn.TimeTravel <| Constants.hours * 2UL
-    do callPip (PokeFunction()) |> ignore
-    do ethConn.TimeTravel <| Constants.hours * 2UL
-    do callPip (PokeFunction()) |> ignore
+    do pokePIP callPip
     do spotterContract.ExecuteFunction "poke" [|ilk|] |> ignore
-
-(**)
-    let ilksOutput = vatContract.QueryObj<VatIlksOutputDTO> "ilks" [|ilk|]
-    let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
-    printfn "AFTER: spot=%A;ink=%A;mul=%A ||| art=%A;rate=%A;mul=%A" ilksOutput.Spot urnsOutput.Ink (ilksOutput.Spot * urnsOutput.Ink) urnsOutput.Art ilksOutput.Rate (urnsOutput.Art * ilksOutput.Rate)
-(**)
 
     let biteResult = catContract.ExecuteFunction "bite" [|ilk;urn|]
     shouldSucceed biteResult
-
-    // unset(1 | 2)
-    // setNext(2)
-    // NOT MANDATORY - function setMin(uint96 min_) - x where x < liquidationPrice
-    // set(1, mockOracleAddress)
-    // poke()
-    // generate mock oracle - function peek() constant returns (bytes32, bool)
-    // set the desired value on it
-
-    //ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", makerOracleMainnet)) |> runNowWithoutResult
-
-    //do callFunctionWithoutSigning (Account(hardhatPrivKey).Address) mockDSValue.Address <| SetDataFunction(Val = liquidationPriceFormatted) |> ignore
-    //do callFunctionWithoutSigningMaker (UnsetFunction(Pos = bigIntToByte12 (bigint 1))) |> ignore
-    //do callFunctionWithoutSigningMaker (UnsetFunction(Pos = bigIntToByte12 (bigint 2))) |> ignore
-    //do callFunctionWithoutSigningMaker (SetNextFunction(Next_ = bigIntToByte12 (bigint 2))) |> ignore
-    //do callFunctionWithoutSigningMaker (SetFunction(Pos = bigIntToByte12 (bigint 1), Wat = mockDSValue.Address)) |> ignore
-    //do callFunctionWithoutSigningMaker <| PokeFunction() |> ignore
-
-    //let currentValue = makerOracleMainnetContract.Query<bigint> "read" [||]
-    //printfn "currentValue: %A" currentValue
-
-    // poke the spotter
-
-
-
