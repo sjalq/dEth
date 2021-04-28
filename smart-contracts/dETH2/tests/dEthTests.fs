@@ -200,15 +200,6 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
     should equal expected actual
 
-let byte12ToInt a = BitConverter.ToInt32( System.ReadOnlySpan(Array.rev a) )
-let bigintToByte size (a:BigInteger) = 
-    let bytes = a.ToByteArray()
-    bytes |> Array.ensureSize size |> Array.rev
-let bigIntToByte12 = bigintToByte 12
-let bigIntToByte32 = bigintToByte 32
-
-let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
-
 let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
     let txInput = functionArgs.CreateTransactionInput(addressTo)
     
