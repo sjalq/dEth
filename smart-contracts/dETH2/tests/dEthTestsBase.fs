@@ -4,6 +4,13 @@ open TestBase
 open Nethereum.Util
 open System.Numerics
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
+open Nethereum.Contracts
+open Nethereum.Web3
+open DETH2.Contracts.VatLike.ContractDefinition
+open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
+
+module Array = 
+    let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
 
 let RAY = BigInteger.Pow(bigint 10, 27);
 let rdiv x y = (x * RAY + y / bigint 2) / y;
@@ -84,6 +91,11 @@ let getDEthContract () =
     let _, contract = getDEthContractAndAuthority ()
     contract
 
+let getMockDSValue price = 
+    let mockDSValue = makeContract [||] "DSValueMock"
+    mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
+    mockDSValue
+
 let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProxy (cdpId:bigint) =
     let priceEthDai = (oracleContract.Query<bigint> "getEthDaiPrice") [||]
     let priceRay = BigInteger.Multiply(BigInteger.Pow(bigint 10, 9), priceEthDai)
@@ -93,3 +105,41 @@ let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProx
     let excessCollateral = cdpDetailedInfoOutput.Collateral - collateralDenominatedDebt
 
     (priceEthDai, priceRay, saverProxy, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral)
+
+let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
+    let txInput = functionArgs.CreateTransactionInput(addressTo)
+    
+    txInput.From <- addressfrom
+    txInput.Gas <- hexBigInt 9500000UL
+    txInput.GasPrice <- hexBigInt 0UL
+    txInput.Value <- hexBigInt 0UL
+
+    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
+
+let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
+        let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
+        let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
+        (ilkBytes, urn)
+
+let findActiveCDP ilkArg =
+    let cdpManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
+    let maxCdpId = cdpManagerContract.Query<bigint> "cdpi" [||]
+    
+    let cdpIds = ( Seq.initInfinite (fun i -> maxCdpId - bigint i) ) |> Seq.takeWhile (fun i -> i > BigInteger.Zero)
+
+    let getInkAndUrnFromCdp = getInkAndUrnFromCdp cdpManagerContract
+
+    let cdpId = Seq.findBack (fun cdpId ->
+        let (ilkBytes, urn) = getInkAndUrnFromCdp cdpId
+        let ilk = System.Text.Encoding.UTF8.GetString(ilkBytes)
+
+        let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
+
+        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg) cdpIds
+
+    getInkAndUrnFromCdp cdpId
+
+let pokePIP pipAddress = 
+    do ethConn.TimeTravel <| Constants.hours * 2UL
+    do callFunctionWithoutSigning ilkPIPAuthority pipAddress (PokeFunction()) |> ignore

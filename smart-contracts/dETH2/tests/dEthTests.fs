@@ -11,9 +11,7 @@ open Nethereum.Web3.Accounts
 open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
 open DETH2.Contracts.DEth.ContractDefinition
-open DETH2.Contracts.MCDSaverProxy.ContractDefinition
-open System;
-open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
+open DETH2.Contracts.MCDSaverProxy.ContractDefinition;
 open Nethereum.Contracts
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
@@ -30,8 +28,6 @@ module Array =
     let ensureSize size array =
         let paddingArray = Array.init size (fun _ -> byte 0)
         Array.concat [|array;paddingArray|] |> Array.take size
-
-    let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
 
 // TODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
 // the constructed oracle itself
@@ -201,49 +197,6 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
     should equal expected actual
 
-let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
-    let txInput = functionArgs.CreateTransactionInput(addressTo)
-    
-    txInput.From <- addressfrom
-    txInput.Gas <- hexBigInt 9500000UL
-    txInput.GasPrice <- hexBigInt 0UL
-    txInput.Value <- hexBigInt 0UL
-
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
-
-let getMockDSValue price = 
-    let mockDSValue = makeContract [||] "DSValueMock"
-    mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
-    mockDSValue
-
-let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
-        let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
-        let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
-        (ilkBytes, urn)
-
-let findActiveCDP ilkArg =
-    let cdpManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
-    let maxCdpId = cdpManagerContract.Query<bigint> "cdpi" [||]
-    
-    let cdpIds = ( Seq.initInfinite (fun i -> maxCdpId - bigint i) ) |> Seq.takeWhile (fun i -> i > BigInteger.Zero)
-
-    let getInkAndUrnFromCdp = getInkAndUrnFromCdp cdpManagerContract
-
-    let cdpId = Seq.findBack (fun cdpId ->
-        let (ilkBytes, urn) = getInkAndUrnFromCdp cdpId
-        let ilk = System.Text.Encoding.UTF8.GetString(ilkBytes)
-
-        let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
-
-        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg) cdpIds
-
-    getInkAndUrnFromCdp cdpId
-
-let pokePIP callPip = 
-    do ethConn.TimeTravel <| Constants.hours * 2UL
-    do callPip (PokeFunction()) |> ignore
-
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () = 
@@ -257,10 +210,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let (ilk, urn) = findActiveCDP ilk
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
-    let callPip (a:#FunctionMessage) = callFunctionWithoutSigning ilkPIPAuthority pipAddress a
-
-    do callPip (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
-    do pokePIP callPip
+    do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
+    do pokePIP pipAddress
     do spotterContract.ExecuteFunction "poke" [|ilk|] |> ignore
 
     let biteResult = catContract.ExecuteFunction "bite" [|ilk;urn|]
