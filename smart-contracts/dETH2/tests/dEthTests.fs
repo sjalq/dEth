@@ -226,37 +226,47 @@ let getMockDSValue price =
     mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
     mockDSValue
 
-let getHistoricalFunctionCalls (contract:ContractPlug) functionSignature =
-    let from = (BlockParameter(hexBigInt 8925094UL))
-    let event = contract.Contract.GetEvent<LogNoteEventDTO>()
-    let filter = event.CreateFilterBlockRangeAsync(fromBlock = from, toBlock = BlockParameter.CreateLatest()) |> runNow
-    let logs = event.GetFilterChanges(filter) |> runNow
-    
-    let encodedFunc = Web3.Sha3(functionSignature).Substring(0, 8).HexToByteArray()
+let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
 
-    for log in logs do
-        if log.Event.Foo = encodedFunc 
-            then printfn "txId: %s, input: %s" log.Log.TransactionHash <| log.Event.Bar.ToHex()
+let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
+        let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> removeFromEnd (byte 0)
+        let ilk = System.Text.Encoding.UTF8.GetString(ilkBytes)
+        let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
+        (ilk, urn)
+
+let findActiveCDP ilkArg =
+    let cdpManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
+    let maxCdpId = cdpManagerContract.Query<bigint> "cdpi" [||]
+    
+    let cdpIds = ( Seq.initInfinite (fun i -> maxCdpId - bigint i) ) |> Seq.takeWhile (fun i -> i > BigInteger.Zero)
+
+    let getInkAndUrnFromCdp = getInkAndUrnFromCdp cdpManagerContract
+
+    let cdpId = Seq.findBack (fun cdpId ->
+        let (ilk, urn) = getInkAndUrnFromCdp cdpId
+
+        let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
+
+        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg
+    ) <| cdpIds
+
+    res
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () = 
     let liquidationPrice = 10M
-    let cdpId = 18783
 
-    let cdpManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
     let catContract = ContractPlug(ethConn, getABI "ICat", cat)
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
     let mockDSValueContract = getMockDSValue liquidationPrice
-    
-    let ilk = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|]
-    let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
+
+    let (cdpId, ilk, urn) = findActiveCDP "ETH-A" |> Option.get
 
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
-
-    let pipContract = ContractPlug(ethConn, getABI "PipLike", pipAddress)
-    getHistoricalFunctionCalls pipContract "rely(address)"
+    let pipAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 
 (**)
     let ilksOutput = vatContract.QueryObj<VatIlksOutputDTO> "ilks" [|ilk|]
@@ -264,11 +274,13 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     printfn "BEFORE: spot=%A;ink=%A;mul=%A ||| art=%A;rate=%A;mul=%A" ilksOutput.Spot urnsOutput.Ink (ilksOutput.Spot * urnsOutput.Ink) urnsOutput.Art ilksOutput.Rate (urnsOutput.Art * ilksOutput.Rate)
 (**)
 
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", pipAddress)) |> runNowWithoutResult
-    let callPip (a:#FunctionMessage) = callFunctionWithoutSigning pipAddress pipAddress a
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", pipAuthority)) |> runNowWithoutResult
+    let callPip (a:#FunctionMessage) = callFunctionWithoutSigning pipAuthority pipAddress a
 
     do callPip (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
+    do ethConn.TimeTravel <| Constants.hours * 2UL
     do callPip (PokeFunction()) |> ignore
+    do ethConn.TimeTravel <| Constants.hours * 2UL
     do callPip (PokeFunction()) |> ignore
     do spotterContract.ExecuteFunction "poke" [|ilk|] |> ignore
 
