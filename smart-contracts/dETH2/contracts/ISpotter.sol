@@ -1,8 +1,18 @@
 pragma solidity ^0.5.17;
 
 contract PipLike {
+    event LogNote(
+        bytes4 indexed sig,
+        address indexed guy,
+        bytes32 indexed foo,
+        bytes32 indexed bar,
+        uint256 wad,
+        bytes fax
+    ) anonymous;
+
     function change(address src_) public;
     function peek() external returns (bytes32, bool);
+    function rely(address usr) public;
 }
 
 contract ISpotter {

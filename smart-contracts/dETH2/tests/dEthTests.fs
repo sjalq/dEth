@@ -226,6 +226,18 @@ let getMockDSValue price =
     mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
     mockDSValue
 
+let getHistoricalFunctionCalls (contract:ContractPlug) functionSignature =
+    let from = (BlockParameter(hexBigInt 8925094UL))
+    let event = contract.Contract.GetEvent<LogNoteEventDTO>()
+    let filter = event.CreateFilterBlockRangeAsync(fromBlock = from, toBlock = BlockParameter.CreateLatest()) |> runNow
+    let logs = event.GetFilterChanges(filter) |> runNow
+    
+    let encodedFunc = Web3.Sha3(functionSignature).Substring(0, 8).HexToByteArray()
+
+    for log in logs do
+        if log.Event.Foo = encodedFunc 
+            then printfn "txId: %s, input: %s" log.Log.TransactionHash <| log.Event.Bar.ToHex()
+
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () = 
@@ -242,6 +254,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
 
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
+
+    let pipContract = ContractPlug(ethConn, getABI "PipLike", pipAddress)
+    getHistoricalFunctionCalls pipContract "rely(address)"
 
 (**)
     let ilksOutput = vatContract.QueryObj<VatIlksOutputDTO> "ilks" [|ilk|]
