@@ -15,7 +15,6 @@ open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 open System;
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
 open Nethereum.Contracts
-open DEth.Contracts.DSValueMock.ContractDefinition
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
 
@@ -31,6 +30,8 @@ module Array =
     let ensureSize size array =
         let paddingArray = Array.init size (fun _ -> byte 0)
         Array.concat [|array;paddingArray|] |> Array.take size
+
+    let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
 
 // TODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
 // the constructed oracle itself
@@ -210,17 +211,13 @@ let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMess
 
     (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
 
-let callFunctionWithoutSigningMaker (functionArgs:#FunctionMessage) = callFunctionWithoutSigning makerOracleMainnet makerOracleMainnet functionArgs
-
 let getMockDSValue price = 
     let mockDSValue = makeContract [||] "DSValueMock"
     mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
     mockDSValue
 
-let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
-
 let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
-        let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> removeFromEnd (byte 0)
+        let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
         let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
         (ilkBytes, urn)
 
