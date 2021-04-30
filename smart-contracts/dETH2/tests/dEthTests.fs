@@ -15,6 +15,7 @@ open DETH2.Contracts.MCDSaverProxy.ContractDefinition;
 open Nethereum.Contracts
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
+open DETH2.Contracts.IFlipper.ContractDefinition
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
 type VatIlksOutputDTO = IlksOutputDTO
@@ -197,6 +198,8 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
     should equal expected actual
 
+let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
+
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () = 
@@ -216,3 +219,43 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let biteResult = catContract.ExecuteFunction "bite" [|ilk;urn|]
     shouldSucceed biteResult
+    
+    // tend(uint256 id, uint256 lot, uint256 bid)  -> (lot, bid) ??
+    // bid is the value we want to bid = bids[id].tab
+    // lot is the quantity for action i.e = bids[id].lot
+    // guy = cat or the address that sent it? msg.sender does it change??
+    // 
+    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = bigint 2)) |> ignore
+    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = bigint 1)) |> ignore
+
+    let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
+    let id = flipperContract.Query<bigint> "kicks" [||]
+    let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
+    let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Bid|]
+    shouldSucceed tendTx
+
+    let dentTx = flipperContract.ExecuteFunction "dent" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Bid|]
+    shouldSucceed dentTx
+
+    // file tau = 2 [seconds]
+    // file ttl = 1 [seconds]
+
+
+
+// recapitalization =
+// collateral module - flipper
+(*Each gem auction is unique and linked to a
+previously bitten urn (Vault). Investors bid with increasing amounts of DAI for a fixed
+GEM amount. When the DAI balance deficit is covered, bidders continue to bid for a
+decreasing gem size until the auction is complete. Remaining GEM is returned to the
+Vault owner.*)
+
+(*
+- when you bite a cdp, the auction process starts, then the ilk is returned to the balance of the owner in the VAT.
+
+*)
+
+// cat.bite -> flipper.kick -> vat.flux()
+
+
+// tend (cover all dept (need to get the debt) ) -> dent immediatelly starts ->  
