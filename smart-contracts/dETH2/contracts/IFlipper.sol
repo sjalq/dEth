@@ -13,6 +13,7 @@ contract IFlipper
         uint256 tab;  // total dai wanted         [rad]
     }
 
+    uint256 public kicks;
     mapping (uint256 => Bid) public bids;
     function file(bytes32 what, uint256 data) external;
     function tend(uint256 id, uint256 lot, uint256 bid) external;
