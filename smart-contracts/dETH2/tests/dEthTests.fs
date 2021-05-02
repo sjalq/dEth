@@ -211,6 +211,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
+    // poke twice
+    do pokePIP pipAddress
     do pokePIP pipAddress
     do spotterContract.ExecuteFunction "poke" [|ilk|] |> ignore
 
