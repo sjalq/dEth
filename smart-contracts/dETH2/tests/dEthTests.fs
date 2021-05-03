@@ -233,11 +233,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let id = flipperContract.Query<bigint> "kicks" [||]
     let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|] // todo - this returns 0 bid ?
-    let bid = bidsOutputDTO.Bid + (bidsOutputDTO.Bid / bigint 100)
-    let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bid|]
+    let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed tendTx
 
-    let dentTx = flipperContract.ExecuteFunction "dent" [|id;bidsOutputDTO.Lot;bid|]
+    let dentTx = flipperContract.ExecuteFunction "dent" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed dentTx
 
     // file tau = 2 [seconds]
