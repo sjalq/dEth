@@ -17,5 +17,7 @@ contract IFlipper
     mapping (uint256 => Bid) public bids;
     function file(bytes32 what, uint256 data) external;
     function tend(uint256 id, uint256 lot, uint256 bid) external;
+    function dent(uint256 id, uint256 lot, uint256 bid) external;
     function tick(uint256 id) external;
+    function deal(uint256 id) external;
 }

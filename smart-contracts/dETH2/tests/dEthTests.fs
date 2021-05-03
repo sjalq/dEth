@@ -234,10 +234,11 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     // lot is the quantity for action i.e = bids[id].lot
     // guy = cat or the address that sent it? msg.sender does it change??
     // 
-    let maxAuctionLengthInSeconds = bigint 2
+    let maxAuctionLengthInSeconds = bigint 50
+    let maxBidLengthInSeconds = bigint 20
 
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> ignore
-    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = bigint 1)) |> ignore
+    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = maxBidLengthInSeconds)) |> ignore
 
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let id = flipperContract.Query<bigint> "kicks" [||]
@@ -247,21 +248,30 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let ethBalanceBeforeTendDent = ethConn.GetEtherBalance ethConn.Account.Address |> Web3.Convert.ToWei
 
+    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
+    let hopeTx = vatContract.ExecuteFunction "hope" [|flipperContract.Address|]
+
     //do callFunctionWithoutSigning spot vat
     let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed tendTx
 
-    let dentTx = flipperContract.ExecuteFunction "dent" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
+    let expectedLot = bidsOutputDTO.Lot - bidsOutputDTO.Lot / bigint 10
+
+    let dentTx = flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|]
     shouldSucceed dentTx
 
     ethConn.TimeTravel maxAuctionLengthInSeconds
+
+    let dealTx = flipperContract.ExecuteFunction "deal" [|id|]
+    shouldSucceed dealTx
 
     let daiContract = ContractPlug(ethConn, getABI "ERC20", daiMainnet)
     let daiBalanceAfterTendDent = daiContract.Query<bigint> "balanceOf" [|ethConn.Account.Address|]
     should equal (bigint 0UL) daiBalanceAfterTendDent
 
     let ethBalanceAfterTendDent = ethConn.GetEtherBalance ethConn.Account.Address |> Web3.Convert.ToWei
-    should equal (bidsOutputDTO.Lot + ethBalanceBeforeTendDent) ethBalanceAfterTendDent
+    printfn "eth balance after tend dent: %A, before: %A" ethBalanceAfterTendDent ethBalanceBeforeTendDent
+    should equal (expectedLot + ethBalanceBeforeTendDent) ethBalanceAfterTendDent
     // file tau = 2 [seconds]
     // file ttl = 1 [seconds]
 
