@@ -203,6 +203,7 @@ let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [||])) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
 
@@ -233,9 +234,11 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let id = flipperContract.Query<bigint> "kicks" [||]
-    let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|] // todo - this returns 0 bid ?
+    let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
 
     let emitDAItx = callFunctionWithoutSigning spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab)
+
+    let ethBalanceBeforeTendDent = ethConn.GetEtherBalance ethConn.Account.Address |> Web3.Convert.ToWei
 
     //do callFunctionWithoutSigning spot vat
     let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
@@ -244,6 +247,12 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let dentTx = flipperContract.ExecuteFunction "dent" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed dentTx
 
+    let daiContract = ContractPlug(ethConn, getABI "ERC20", daiMainnet)
+    let daiBalanceAfterTendDent = daiContract.Query<bigint> "balanceOf" [|ethConn.Account.Address|]
+    should equal (bigint 0UL) daiBalanceAfterTendDent
+
+    let ethBalanceAfterTendDent = ethConn.GetEtherBalance ethConn.Account.Address |> Web3.Convert.ToWei
+    should equal (bidsOutputDTO.Lot + ethBalanceBeforeTendDent) ethBalanceAfterTendDent
     // file tau = 2 [seconds]
     // file ttl = 1 [seconds]
 

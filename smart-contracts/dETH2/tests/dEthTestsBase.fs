@@ -39,6 +39,7 @@ let ilk = "ETH-A"
 let ilkPIPAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 let ilkFlipper = "0xF32836B9E1f47a0515c6Ec431592D5EbC276407f"
 let ilkFlipperAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
+let daiMainnet = "0x6b175474e89094c44da98b954eedeac495271d0f"
 
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 
