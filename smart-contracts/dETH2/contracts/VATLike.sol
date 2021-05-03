@@ -15,4 +15,5 @@ contract VatLike {
     function grab(bytes32,address,address,address,int256,int256) external;
     function hope(address) external;
     function nope(address) external;
+    function suck(address u, address v, uint rad) external; // emit new dai
 }

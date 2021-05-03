@@ -142,7 +142,7 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
 
     member this.ExecuteFunction functionName arguments = 
         this.ExecuteFunctionAsync functionName arguments |> runNow
-            
+
 
 type Debug(ethConn: EthereumConnection) =
     member val public EthConn = ethConn

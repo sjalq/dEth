@@ -202,10 +202,11 @@ let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
-let ``biting of a CDP - should bite when collateral is < 150`` () = 
+let ``biting of a CDP - should bite when collateral is < 150`` () =
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
 
-    let liquidationPrice = 10M
+    let liquidationPrice = 1500M
     let catContract = ContractPlug(ethConn, getABI "ICat", cat)
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
     let mockDSValueContract = getMockDSValue liquidationPrice
@@ -233,6 +234,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let id = flipperContract.Query<bigint> "kicks" [||]
     let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|] // todo - this returns 0 bid ?
+
+    let emitDAItx = callFunctionWithoutSigning spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab)
+
+    //do callFunctionWithoutSigning spot vat
     let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed tendTx
 
