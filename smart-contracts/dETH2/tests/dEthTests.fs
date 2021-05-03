@@ -200,10 +200,15 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
 let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
 
+
+// todo:
+// fix the issue with hardhat_reset
+// events emitted
+
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [||])) |> runNowWithoutResult
+    //ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [||])) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
 
@@ -229,7 +234,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     // lot is the quantity for action i.e = bids[id].lot
     // guy = cat or the address that sent it? msg.sender does it change??
     // 
-    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = bigint 2)) |> ignore
+    let maxAuctionLengthInSeconds = bigint 2
+
+    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> ignore
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = bigint 1)) |> ignore
 
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
@@ -246,6 +253,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let dentTx = flipperContract.ExecuteFunction "dent" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed dentTx
+
+    ethConn.TimeTravel maxAuctionLengthInSeconds
 
     let daiContract = ContractPlug(ethConn, getABI "ERC20", daiMainnet)
     let daiBalanceAfterTendDent = daiContract.Query<bigint> "balanceOf" [|ethConn.Account.Address|]
