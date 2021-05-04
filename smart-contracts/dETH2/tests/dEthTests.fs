@@ -268,8 +268,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
 //  
     let dEthContract = getDEthContract ()
-    let saverProxyActionsContract = ContractPlug(ethConn, getABI "SaverProxyActions", saverProxyActions)
-    let cdpOwner = saverProxyActionsContract.Query<string> "owns" [|cdpId|]
+    let managerLikeContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
+    let cdpOwner = managerLikeContract.Query<string> "owns" [|cdpId|]
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", dEthMainnetOwner)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", cdpOwner)) |> runNowWithoutResult
     do callFunctionWithoutSigning cdpOwner saverProxyActions (GiveFunction(Manager = makerManager, Cdp = cdpId, Usr = dEthContract.Address)) |> ignore
 //
