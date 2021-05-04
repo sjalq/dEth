@@ -76,7 +76,7 @@ contract IVAT
 
 contract IMakerManager 
 {
-    function VAT()
+    function vat()
         public
         view
         returns(IVAT);
@@ -510,7 +510,8 @@ contract dEth is
         // *look up the balance of the urn
         // *frob that value back into the cdp
 
-        uint256 urnBalance = IMakerManager(makerManager).VAT().urns(bytes32(cdpId), address(this));
+        uint256 urnBalance = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
+        console.log("urn balance", urnBalance);
 
         bytes memory frobProxyCall = abi.encodeWithSignature(
             "frob(address,uint256,int256,int256)",
@@ -518,8 +519,10 @@ contract dEth is
             cdpId,
             0,
             int256(urnBalance));
+        console.log("frob data");
 
         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
+        console.log("frobbed");
     }
     
     function () external payable { }
