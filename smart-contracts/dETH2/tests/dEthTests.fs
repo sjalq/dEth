@@ -217,7 +217,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
     let mockDSValueContract = getMockDSValue liquidationPrice
 
-    let (ilk, urn) = findActiveCDP ilk
+    let (ilk, urn) = getInkAndUrnFromCdp (ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)) 18963
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
@@ -264,6 +264,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let dealTx = flipperContract.ExecuteFunction "deal" [|id|]
     shouldSucceed dealTx
+
+    let dEthContract = getDEthContract ()
+
+    let moveVatTx = dEthContract.ExecuteFunction "moveVatEthToCDP" [||] 
 
     let daiContract = ContractPlug(ethConn, getABI "ERC20", daiMainnet)
     let daiBalanceAfterTendDent = daiContract.Query<bigint> "balanceOf" [|ethConn.Account.Address|]
