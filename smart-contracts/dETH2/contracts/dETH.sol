@@ -71,7 +71,7 @@ contract IVAT
     function urns(bytes32 cdp, address owner)
         public
         view
-        returns(uint256);
+        returns(uint256 ink, uint256 art);
 }
 
 contract IMakerManager 
@@ -510,15 +510,16 @@ contract dEth is
         // *look up the balance of the urn
         // *frob that value back into the cdp
 
-        uint256 urnBalance = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
-        console.log("urn balance", urnBalance);
+        (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
+        console.log("ink balance", ink);
+        console.log("art balance", art);
 
         bytes memory frobProxyCall = abi.encodeWithSignature(
             "frob(address,uint256,int256,int256)",
             makerManager,
             cdpId,
             0,
-            int256(urnBalance));
+            int256(ink));
         console.log("frob data");
 
         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
