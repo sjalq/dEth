@@ -16,6 +16,7 @@ open Nethereum.Contracts
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
 open DETH2.Contracts.IFlipper.ContractDefinition
+open DETH2.Contracts.SaverProxyActions.ContractDefinition
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
 type VatIlksOutputDTO = IlksOutputDTO
@@ -217,7 +218,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
     let mockDSValueContract = getMockDSValue liquidationPrice
 
-    let (ilk, urn) = getInkAndUrnFromCdp (ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)) 18963
+    let (ilk, urn) = getInkAndUrnFromCdp (ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)) cdpId
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
@@ -265,7 +266,13 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let dealTx = flipperContract.ExecuteFunction "deal" [|id|]
     shouldSucceed dealTx
 
+//  
     let dEthContract = getDEthContract ()
+    let saverProxyActionsContract = ContractPlug(ethConn, getABI "SaverProxyActions", saverProxyActions)
+    let cdpOwner = saverProxyActionsContract.Query<string> "owns" [|cdpId|]
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", cdpOwner)) |> runNowWithoutResult
+    do callFunctionWithoutSigning cdpOwner saverProxyActions (GiveFunction(Manager = makerManager, Cdp = cdpId, Usr = dEthContract.Address)) |> ignore
+//
 
     let moveVatTx = dEthContract.ExecuteFunction "moveVatEthToCDP" [||] 
 
