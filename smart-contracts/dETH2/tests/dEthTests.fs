@@ -16,7 +16,7 @@ open Nethereum.Contracts
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
 open DETH2.Contracts.IFlipper.ContractDefinition
-open DETH2.Contracts.SaverProxyActions.ContractDefinition
+open DETH2.Contracts.ManagerLike.ContractDefinition
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
 type VatIlksOutputDTO = IlksOutputDTO
@@ -270,9 +270,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let dEthContract = getDEthContract ()
     let managerLikeContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
     let cdpOwner = managerLikeContract.Query<string> "owns" [|cdpId|]
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", dEthMainnetOwner)) |> runNowWithoutResult
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", cdpOwner)) |> runNowWithoutResult
-    do callFunctionWithoutSigning cdpOwner saverProxyActions (GiveFunction(Manager = makerManager, Cdp = cdpId, Usr = dEthContract.Address)) |> ignore
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", cdpOwner)) |> runNowWithoutResult
+    do callFunctionWithoutSigning cdpOwner makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
 //
 
     let moveVatTx = dEthContract.ExecuteFunction "moveVatEthToCDP" [||] 
