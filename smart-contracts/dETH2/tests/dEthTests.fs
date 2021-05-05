@@ -19,8 +19,8 @@ open DETH2.Contracts.IFlipper.ContractDefinition
 open DETH2.Contracts.ManagerLike.ContractDefinition
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
-type VatIlksOutputDTO = IlksOutputDTO
-
+type VatIlksOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.IlksOutputDTO
+type VatUrnsOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.UrnsOutputDTO
 
 type System.String with
    member s1.icompare(s2: string) =
@@ -221,8 +221,13 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let catContract = ContractPlug(ethConn, getABI "ICat", cat)
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
     let mockDSValueContract = getMockDSValue liquidationPrice
+    let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
+    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
+    let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+    let managerLikeContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
+    let dEthMainnetContract = ContractPlug(ethConn, getABI "dEth", dEthMainnet)
 
-    let (ilk, urn) = getInkAndUrnFromCdp (ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)) cdpId
+    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
@@ -231,60 +236,42 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     do pokePIP pipAddress
     do spotterContract.ExecuteFunction "poke" [|ilk|] |> ignore
 
-    let biteResult = catContract.ExecuteFunction "bite" [|ilk;urn|]
-    shouldSucceed biteResult
+    catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
     
-    // tend(uint256 id, uint256 lot, uint256 bid)  -> (lot, bid) ??
-    // bid is the value we want to bid = bids[id].tab
-    // lot is the quantity for action i.e = bids[id].lot
-    // guy = cat or the address that sent it? msg.sender does it change??
-    // 
     let maxAuctionLengthInSeconds = bigint 50
     let maxBidLengthInSeconds = bigint 20
-
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> ignore
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = maxBidLengthInSeconds)) |> ignore
 
-    let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let id = flipperContract.Query<bigint> "kicks" [||]
     let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
-
-    let emitDAItx = callFunctionWithoutSigning spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab)
-
-    let ethBalanceBeforeTendDent = ethConn.GetEtherBalance ethConn.Account.Address |> Web3.Convert.ToWei
-
-    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
-    let hopeTx = vatContract.ExecuteFunction "hope" [|flipperContract.Address|]
-
-    let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
-    shouldSucceed tendTx
-
     let expectedLot = bidsOutputDTO.Lot - bidsOutputDTO.Lot / bigint 10
 
-    let dentTx = flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|]
-    shouldSucceed dentTx
+    do callFunctionWithoutSigning spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab) |> ignore
+
+    vatContract.ExecuteFunction "hope" [|flipperContract.Address|] |> shouldSucceed
+    flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|] |> shouldSucceed
+    flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|] |> shouldSucceed
+
+    let guyUrnsOutputBefore = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; bidsOutputDTO.Guy|]
 
     ethConn.TimeTravel maxAuctionLengthInSeconds
+    flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
 
-    let dealTx = flipperContract.ExecuteFunction "deal" [|id|]
-    shouldSucceed dealTx
+    let guyUrnsOutputAfter = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; bidsOutputDTO.Guy|]
 
-//  
-    let dEthContract = getDEthContract ()
-    let managerLikeContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
-    let cdpOwner = managerLikeContract.Query<string> "owns" [|cdpId|]
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", cdpOwner)) |> runNowWithoutResult
-    do callFunctionWithoutSigning cdpOwner makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
-//
+    let transferredETH = vatContract.Query<bigint> "gem" [|ilk;bidsOutputDTO.Guy|]
+    printfn "transferredETH: %A, guyYrnsBefore = A=%A,I=%A, urnsAfter = A=%A,I=%A" transferredETH guyUrnsOutputBefore.Art guyUrnsOutputBefore.Ink guyUrnsOutputAfter.Art guyUrnsOutputAfter.Ink
 
-    let urnsOutputBefore = vatContract.QueryObj<UrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthContract.Address|]
-    let moveVatTx = dEthContract.ExecuteFunction "moveVatEthToCDP" [||] 
-    let urnsOutputAfter = vatContract.QueryObj<UrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthContract.Address|]
+    let excessCollateralBeforeMove = dEthMainnetContract.Query<bigint> "getExcessCollateral" [||]
 
-   
-    let daiContract = ContractPlug(ethConn, getABI "ERC20", daiMainnet)
-    let daiBalanceAfterTendDent = daiContract.Query<bigint> "balanceOf" [|ethConn.Account.Address|]
-    should equal (bigint 0UL) daiBalanceAfterTendDent 
+    let cdpUrnsOutputBefore = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthMainnetContract.Address|]
+
+    dEthMainnetContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
+    
+    let cdpUrnsOutputAfter = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthMainnetContract.Address|]
+
+    printfn "cdpUrnsOutputBefore: %A, cdpUrnsOutputAfter %A" cdpUrnsOutputBefore cdpUrnsOutputAfter
 
 
 

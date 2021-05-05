@@ -513,6 +513,7 @@ contract dEth is
         (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
         console.log("ink balance", ink);
         console.log("art balance", art);
+        console.log("excess collateral 1:", getExcessCollateral());
 
         bytes memory frobProxyCall = abi.encodeWithSignature(
             "frob(address,uint256,int256,int256)",
@@ -528,6 +529,8 @@ contract dEth is
         (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
         console.log("ink1 balance", ink1);
         console.log("art1 balance", art1);
+
+        console.log("excess collateral 2:", getExcessCollateral());
     }
     
     function () external payable { }

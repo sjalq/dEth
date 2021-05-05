@@ -1,6 +1,7 @@
 pragma solidity ^0.5.17;
 
 contract VatLike {
+    mapping (bytes32 => mapping (address => uint)) public gem;  // [wad]    
     function ilks(bytes32) external view returns (
         uint256 Art,  // [wad]
         uint256 rate, // [ray]
