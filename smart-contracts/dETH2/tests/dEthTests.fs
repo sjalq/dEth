@@ -224,28 +224,50 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    let managerLikeContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
     let dEthMainnetContract = ContractPlug(ethConn, getABI "dEth", dEthMainnet)
 
-    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
-    let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
+    let dEthContract = getDEthContract ()
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", dEthMainnetContract.Address)) |> runNowWithoutResult
+    do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
 
+    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
+    let ilkString = System.Text.Encoding.UTF8.GetString(ilk)
+    let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
+    let guyAddress = Account(hardhatPrivKey).Address
+    let cdpOwnerAddress = dEthContract.Address
+
+    let urnsOutputBefore = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilkString;urn|]
+    let excessCollateralBeforeMove = dEthContract.Query<bigint> "getExcessCollateral" [||]
+
+    printfn "a"
+    should be (greaterThan <| bigint 0) urnsOutputBefore.Ink
+    should be (greaterThan <| bigint 0) excessCollateralBeforeMove
+
+// change the oracle prices, bite the cdp.
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
+
     // poke twice
     do pokePIP pipAddress
     do pokePIP pipAddress
-    do spotterContract.ExecuteFunction "poke" [|ilk|] |> ignore
-
+    spotterContract.ExecuteFunction "poke" [|ilk|] |> shouldSucceed
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
-    
+
+    let excessCollateralAfterBite = dEthContract.Query<bigint> "getExcessCollateral" [||]
+
+    should equal (bigint 0) excessCollateralAfterBite 
+
+// open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
     let maxBidLengthInSeconds = bigint 20
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> ignore
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = maxBidLengthInSeconds)) |> ignore
 
     let id = flipperContract.Query<bigint> "kicks" [||]
+    
     let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
-    let expectedLot = bidsOutputDTO.Lot - bidsOutputDTO.Lot / bigint 10
+    let expectedLot = bidsOutputDTO.Lot - bidsOutputDTO.Lot / bigint 10M
+
+    printfn "expectedLot: %A" expectedLot
 
     do callFunctionWithoutSigning spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab) |> ignore
 
@@ -253,27 +275,27 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|] |> shouldSucceed
     flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|] |> shouldSucceed
 
-    let guyUrnsOutputBefore = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; bidsOutputDTO.Guy|]
+    let excessCollateralAfterTendDent = dEthContract.Query<bigint> "getExcessCollateral" [||]
+
+    let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
+    should equal guyAddress bidsOutputDTO.Guy
 
     ethConn.TimeTravel maxAuctionLengthInSeconds
     flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
 
-    let guyUrnsOutputAfter = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; bidsOutputDTO.Guy|]
-
-    let transferredETH = vatContract.Query<bigint> "gem" [|ilk;bidsOutputDTO.Guy|]
-    printfn "transferredETH: %A, guyYrnsBefore = A=%A,I=%A, urnsAfter = A=%A,I=%A" transferredETH guyUrnsOutputBefore.Art guyUrnsOutputBefore.Ink guyUrnsOutputAfter.Art guyUrnsOutputAfter.Ink
-
-    let excessCollateralBeforeMove = dEthMainnetContract.Query<bigint> "getExcessCollateral" [||]
-
-    let cdpUrnsOutputBefore = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthMainnetContract.Address|]
-
-    dEthMainnetContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
+    dEthContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
     
-    let cdpUrnsOutputAfter = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthMainnetContract.Address|]
+    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
+    let ilkString = System.Text.Encoding.UTF8.GetString(ilk)
+    let urnsOutputAfter = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilkString;urn|]
 
-    printfn "cdpUrnsOutputBefore: %A, cdpUrnsOutputAfter %A" cdpUrnsOutputBefore cdpUrnsOutputAfter
+    let excessCollateralAfterMove = dEthContract.Query<bigint> "getExcessCollateral" [||]
+
+    let guyTransferredETH = vatContract.Query<bigint> "gem" [|ilk;guyAddress|]
+    let cdpTransferredETH = vatContract.Query<bigint> "gem" [|ilk;cdpOwnerAddress|]
 
 
+    printfn "cdpUrnsOutputBefore: %A, cdpUrnsOutputAfter %A" urnsOutputBefore urnsOutputAfter
 
 // recapitalization =
 // collateral module - flipper
@@ -285,10 +307,4 @@ Vault owner.*)
 
 (*
 - when you bite a cdp, the auction process starts, then the ilk is returned to the balance of the owner in the VAT.
-
 *)
-
-// cat.bite -> flipper.kick -> vat.flux()
-
-
-// tend (cover all dept (need to get the debt) ) -> dent immediatelly starts ->  
