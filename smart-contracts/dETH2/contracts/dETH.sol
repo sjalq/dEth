@@ -524,6 +524,10 @@ contract dEth is
 
         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
         console.log("frobbed");
+
+        (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
+        console.log("ink1 balance", ink1);
+        console.log("art1 balance", art1);
     }
     
     function () external payable { }

@@ -206,6 +206,10 @@ let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.
 // fix the issue with hardhat_reset
 // events emitted
 
+let bigintToByte size (a:BigInteger) = 
+    let bytes = a.ToByteArray()
+    bytes |> Array.ensureSize size |> Array.rev
+
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
@@ -252,7 +256,6 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let hopeTx = vatContract.ExecuteFunction "hope" [|flipperContract.Address|]
 
-    //do callFunctionWithoutSigning spot vat
     let tendTx = flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|]
     shouldSucceed tendTx
 
@@ -274,17 +277,14 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     do callFunctionWithoutSigning cdpOwner makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
 //
 
+    let urnsOutputBefore = vatContract.QueryObj<UrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthContract.Address|]
     let moveVatTx = dEthContract.ExecuteFunction "moveVatEthToCDP" [||] 
+    let urnsOutputAfter = vatContract.QueryObj<UrnsOutputDTO> "urns" [|bigintToByte 32 cdpId; dEthContract.Address|]
 
+   
     let daiContract = ContractPlug(ethConn, getABI "ERC20", daiMainnet)
     let daiBalanceAfterTendDent = daiContract.Query<bigint> "balanceOf" [|ethConn.Account.Address|]
-    should equal (bigint 0UL) daiBalanceAfterTendDent
-
-    let ethBalanceAfterTendDent = ethConn.GetEtherBalance ethConn.Account.Address |> Web3.Convert.ToWei
-    printfn "eth balance after tend dent: %A, before: %A" ethBalanceAfterTendDent ethBalanceBeforeTendDent
-    should equal (expectedLot + ethBalanceBeforeTendDent) ethBalanceAfterTendDent
-    // file tau = 2 [seconds]
-    // file ttl = 1 [seconds]
+    should equal (bigint 0UL) daiBalanceAfterTendDent 
 
 
 
