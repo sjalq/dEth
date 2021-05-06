@@ -236,7 +236,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
 
     let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
-    let wantedPrice = currentPrice / bigint 2; // (  (currentPrice * BigInteger.Pow(bigint 10, 16)) / (BigDecimal(1.7802844924027803M) * BigDecimal.Pow(10.0, 16.0)).Mantissa) / BigInteger.Pow(bigint 10, 16)
+    let wantedPrice = (  (currentPrice * BigInteger.Pow(bigint 10, 16)) / (BigDecimal(1.4733388902643698M) * BigDecimal.Pow(10.0, 16.0)).Mantissa)
     let mockDSValueContract = getMockDSValueFormat wantedPrice
     let (_, dEthContract) = getDEthContractFromOracle <| oracleAdapter
     do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
