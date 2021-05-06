@@ -143,6 +143,22 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
     member this.ExecuteFunction functionName arguments = 
         this.ExecuteFunctionAsync functionName arguments |> runNow
 
+(*
+  console.log:
+    result of reading 3429740000000000000000
+    Price RAY:  3429740000000000000000000000000
+    _totalCollateral:  71638314300090806328
+    _debt:  116825771461731288902718
+    _collateralDenominatedDebt:  34062573682474849086
+    _excessCollateral:  37575740617615957242
+
+    result of reading 150000000000000000
+    Price RAY:  150000000000000000000000000
+    _totalCollateral:  44505286405029419769
+    _debt:  72577983851111819876169
+    _collateralDenominatedDebt:  483853225674078799174460
+*)
+
 
 type Debug(ethConn: EthereumConnection) =
     member val public EthConn = ethConn

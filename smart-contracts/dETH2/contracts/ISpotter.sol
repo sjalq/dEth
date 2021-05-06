@@ -13,6 +13,7 @@ contract PipLike {
     function change(address src_) public;
     function peek() external returns (bytes32, bool);
     function rely(address usr) public;
+    function kiss(address a) external;
 }
 
 contract ISpotter {

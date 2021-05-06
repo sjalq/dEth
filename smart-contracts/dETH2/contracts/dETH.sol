@@ -248,15 +248,14 @@ contract dEth is
         returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
         _priceRAY = getCollateralPriceRAY();
-        (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
-        _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
-        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
         console.log("Price RAY: ", _priceRAY);
+        (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         console.log("_totalCollateral: ", _totalCollateral);
         console.log("_debt: ", _debt);
+        _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
         console.log("_collateralDenominatedDebt: ", _collateralDenominatedDebt);
-        console.log("_totalCollateral: ", _totalCollateral);
-        console.log("_excessCollateral: ", _excessCollateral);                        
+        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
+        console.log("_excessCollateral: ", _excessCollateral);
     }
 
     function getCollateralPriceRAY()
