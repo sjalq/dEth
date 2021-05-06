@@ -68,7 +68,7 @@ contract IMakerOracle
 
 contract IVAT
 {
-    function urns(bytes32 cdp, address owner)
+    function urns(bytes32 ilk, address owner)
         public
         view
         returns(uint256 ink, uint256 art);
@@ -80,6 +80,12 @@ contract IMakerManager
         public
         view
         returns(IVAT);
+        
+
+    function ilks(uint256 cdpId)
+        public
+        view
+        returns(bytes32 ilk);
 }
 
 contract Oracle
@@ -94,9 +100,9 @@ contract Oracle
     IChainLinkPriceOracle public ethUsdOracle;
 
     constructor (
-            IMakerOracle _makerOracle, // 0x81FE72B5A8d1A857d176C3E7d5Bd2679A9B85763
-            IChainLinkPriceOracle _daiUsdOracle, // 0x7663c5790e1ebf04197245d541279d13f3c2f362
-            IChainLinkPriceOracle _ethUsdOracle) // 0xD45727E3D7405C6Ab3B2b3A57474012e1f998483
+            IMakerOracle _makerOracle, 
+            IChainLinkPriceOracle _daiUsdOracle, 
+            IChainLinkPriceOracle _ethUsdOracle) 
         public
     {
         makerOracle = _makerOracle;
@@ -230,16 +236,13 @@ contract dEth is
         public
         auth
     {
-        console.log("0");
         bytes memory giveProxyCall = abi.encodeWithSignature(
             "give(address,uint256,address)", 
             makerManager, 
             cdpId, 
             _dsProxy);
         
-        console.log("1");
         IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
-        console.log("2");
     }
 
     function getCollateral()
@@ -509,7 +512,8 @@ contract dEth is
         // *look up the balance of the urn
         // *frob that value back into the cdp
 
-        (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
+        bytes32 ilk = IMakerManager(makerManager).ilks(cdpId);
+        (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(ilk, address(this));
         console.log("ink balance", ink);
         console.log("art balance", art);
         console.log("excess collateral 1:", getExcessCollateral());
@@ -525,7 +529,7 @@ contract dEth is
         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
         console.log("frobbed");
 
-        (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(bytes32(cdpId), address(this));
+        (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(ilk, address(this));
         console.log("ink1 balance", ink1);
         console.log("art1 balance", art1);
 
