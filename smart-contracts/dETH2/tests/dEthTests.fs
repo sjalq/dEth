@@ -17,6 +17,7 @@ open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
 open DETH2.Contracts.IFlipper.ContractDefinition
 open DETH2.Contracts.ManagerLike.ContractDefinition
+open Nethereum.Util
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
 type VatIlksOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.IlksOutputDTO
@@ -210,16 +211,6 @@ let bigintToByte size (a:BigInteger) =
     let bytes = a.ToByteArray()
     bytes |> Array.ensureSize size |> Array.rev
 
-(*
-     Price RAY:  3435162364316085194000000000000
-    _totalCollateral:  71638314300090806328
-    _debt:  116824377317871174897958
-->
-    Price RAY:  3435162364316085194000000000000
-    _totalCollateral:  44504962608360311264
-    _debt:  72576589707251705871409
-*)
-
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
@@ -228,10 +219,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
 
-    let liquidationPrice = 0.000015M
     let catContract = ContractPlug(ethConn, getABI "ICat", cat)
     let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
-    let mockDSValueContract = getMockDSValue liquidationPrice
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
@@ -246,6 +235,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
 
+    let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
+    let wantedPrice = currentPrice / bigint 2; // (  (currentPrice * BigInteger.Pow(bigint 10, 16)) / (BigDecimal(1.7802844924027803M) * BigDecimal.Pow(10.0, 16.0)).Mantissa) / BigInteger.Pow(bigint 10, 16)
+    let mockDSValueContract = getMockDSValueFormat wantedPrice
     let (_, dEthContract) = getDEthContractFromOracle <| oracleAdapter
     do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
     let guyAddress = Account(hardhatPrivKey).Address
@@ -265,6 +257,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     do pokePIP pipAddress
     do pokePIP pipAddress
     spotterContract.ExecuteFunction "poke" [|ilk|] |> shouldSucceed
+
+    let excessCollateralAfterPokingBeforeBiting = dEthContract.Query<bigint> "getExcessCollateral" [||]
+
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
 
     let excessCollateralAfterBite = dEthContract.Query<bigint> "getExcessCollateral" [||]

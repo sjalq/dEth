@@ -52,7 +52,6 @@ let ethUsdMainnet = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
 let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
 let oracleContractMainnet = makeOracle makerOracleMainnet daiUsdMainnet ethUsdMainnet
 
-// 18 places
 let toMakerPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 18.0))).Mantissa
 let toMakerPriceFormat = decimal >> toMakerPriceFormatDecimal
 
@@ -94,10 +93,12 @@ let getDEthContract () =
     let _, contract = getDEthContractAndAuthority ()
     contract
 
-let getMockDSValue price = 
+let getMockDSValueFormat priceFormatted =
     let mockDSValue = makeContract [||] "DSValueMock"
-    mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
+    mockDSValue.ExecuteFunction "setData" [|priceFormatted |] |> ignore
     mockDSValue
+
+let getMockDSValue price = toMakerPriceFormat price |> getMockDSValueFormat
 
 let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProxy (cdpId:bigint) =
     let priceEthDai = (oracleContract.Query<bigint> "getEthDaiPrice") [||]
