@@ -224,7 +224,6 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    let dEthMainnetContract = ContractPlug(ethConn, getABI "dEth", dEthMainnet)
     let oracleAdapter = makeContract [||] "MakerOracleAdapter"
 
     let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
@@ -232,11 +231,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (KissFunction(A=oracleAdapter.Address)) |> ignore
-
     oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
 
     let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
-    let wantedPrice = (  (currentPrice * BigInteger.Pow(bigint 10, 16)) / (BigDecimal(1.4733388902643698M) * BigDecimal.Pow(10.0, 16.0)).Mantissa)
+    let wantedPrice = ((currentPrice * BigInteger.Pow(bigint 10, 16)) / (BigDecimal(1.4733388902643698M) * BigDecimal.Pow(10.0, 16.0)).Mantissa)
     let mockDSValueContract = getMockDSValueFormat wantedPrice
     let (_, dEthContract) = getDEthContractFromOracle <| oracleAdapter
     do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
@@ -246,26 +244,23 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let urnsOutputBefore = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilkString;urn|]
     let excessCollateralBeforeMove = dEthContract.Query<bigint> "getExcessCollateral" [||]
 
-    printfn "a"
     should be (greaterThan <| bigint 0) urnsOutputBefore.Ink
     should be (greaterThan <| bigint 0) excessCollateralBeforeMove
 
-// change the oracle prices, bite the cdp.
+    // change the oracle prices, bite the cdp.
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
 
     // poke twice
     do pokePIP pipAddress
     do pokePIP pipAddress
-    spotterContract.ExecuteFunction "poke" [|ilk|] |> shouldSucceed
-
-    let excessCollateralAfterPokingBeforeBiting = dEthContract.Query<bigint> "getExcessCollateral" [||]
+    spotterContract.ExecuteFunction "poke" [|ilk|] |> shouldSucceed    
 
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
 
     let excessCollateralAfterBite = dEthContract.Query<bigint> "getExcessCollateral" [||]
     //should equal (bigint 0) excessCollateralAfterBite 
 
-// open auction to sell the ilk in cdp
+    // open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
     let maxBidLengthInSeconds = bigint 20
     do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> ignore
@@ -286,9 +281,6 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let excessCollateralAfterTendDent = dEthContract.Query<bigint> "getExcessCollateral" [||]
 
-    let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
-    should equal guyAddress bidsOutputDTO.Guy
-
     ethConn.TimeTravel maxAuctionLengthInSeconds
     flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
 
@@ -302,18 +294,4 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     let guyTransferredETH = vatContract.Query<bigint> "gem" [|ilk;guyAddress|]
     let cdpTransferredETH = vatContract.Query<bigint> "gem" [|ilk;cdpOwnerAddress|]
-
-
-    printfn "cdpUrnsOutputBefore: %A, cdpUrnsOutputAfter %A" urnsOutputBefore urnsOutputAfter
-
-// recapitalization =
-// collateral module - flipper
-(*Each gem auction is unique and linked to a
-previously bitten urn (Vault). Investors bid with increasing amounts of DAI for a fixed
-GEM amount. When the DAI balance deficit is covered, bidders continue to bid for a
-decreasing gem size until the auction is complete. Remaining GEM is returned to the
-Vault owner.*)
-
-(*
-- when you bite a cdp, the auction process starts, then the ilk is returned to the balance of the owner in the VAT.
-*)
+    ()

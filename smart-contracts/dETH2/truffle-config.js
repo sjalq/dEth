@@ -36,11 +36,6 @@ module.exports = {
    */
 
   networks: {
-    hardhat: {
-      forking: {
-        blockNumber: 12330245
-      }
-    }
   },
 
   // Set default mocha options here, use special reporters etc.
