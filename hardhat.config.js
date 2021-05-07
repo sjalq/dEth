@@ -23,7 +23,10 @@ module.exports = {
       chainId: 1337,
       throwOnCallFailures: true,
       throwOnTransactionFailures: true,
-      gasPrice: 0
+      gasPrice: 0,
+      forking: { 
+      	fork-block-number: 12330245
+      }
     },
   }
 };
