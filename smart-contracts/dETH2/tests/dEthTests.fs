@@ -250,8 +250,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     // calculate price to make the ratio between total collateral and collateral denominated debt 145%
     let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
-    let initialCollateralOutput = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let ratio = toBigDecimal initialCollateralOutput.TotalCollateral / toBigDecimal initialCollateralOutput.CollateralDenominatedDebt
+    let collateralOutputInitial = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
+    let urnDTOInitial = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
+    let ratio = toBigDecimal collateralOutputInitial.TotalCollateral / toBigDecimal collateralOutputInitial.CollateralDenominatedDebt
     let wantedRatio = 1.45M
     let diff = ratio / BigDecimal wantedRatio
     let wantedPrice = (toBigDecimal currentPrice / BigDecimal(diff))
@@ -271,15 +272,17 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     spotterContract.ExecuteFunction "poke" [|ilk|] |> shouldSucceed
 
     let collateralOutputAfterPriceChange = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    should be (lessThan <| initialCollateralOutput.ExcessCollateral) collateralOutputAfterPriceChange.ExcessCollateral
-    should equal initialCollateralOutput.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral
-    let collateralDebtDiff = Math.Round(decimal (toBigDecimal collateralOutputAfterPriceChange.CollateralDenominatedDebt / toBigDecimal initialCollateralOutput.CollateralDenominatedDebt), 5)
+    let urnDTOAfterPriceChange = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
+    should be (lessThan <| collateralOutputInitial.ExcessCollateral) collateralOutputAfterPriceChange.ExcessCollateral
+    should equal collateralOutputInitial.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral
+    let collateralDebtDiff = Math.Round(decimal (toBigDecimal collateralOutputAfterPriceChange.CollateralDenominatedDebt / toBigDecimal collateralOutputInitial.CollateralDenominatedDebt), 5)
     let priceDiff = Math.Round((decimal diff), 5)
     should equal priceDiff collateralDebtDiff
 
     // STEP 2 - bite, current excessCollateral should be within 0-30% of the excess collateral before biting. as the vat.grab() is called and the vault gets liquidated.
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
 
+    let urnDTOAfterBite = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
     let collateralOutputAfterBite = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
     let percentDiff = bigintDifference collateralOutputAfterBite.Debt collateralOutputAfterPriceChange.Debt 4
     let percentTotalCollateral = bigintDifference collateralOutputAfterBite.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral 4
@@ -314,6 +317,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     // after hope/tend/dent/deal - the values should drop to 35 percents of original or less
     // doesn't change
+    let urnDTOAfterAuctionEnd = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]    
     let collateralOutputAfterAuctionEnd = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
 
     // STEP 4: MoveVatEthToCDP
@@ -321,5 +325,5 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     dEthContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
     
     let collateralOutputAfterMoveVat = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    ()
+    let urnDTOAfterMoveVat = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
     ()
