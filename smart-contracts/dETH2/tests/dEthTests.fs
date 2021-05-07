@@ -279,7 +279,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let priceDiff = Math.Round((decimal diff), 5)
     should equal priceDiff collateralDebtDiff
 
-    // STEP 2 - bite, current excessCollateral should be within 0-30% of the excess collateral before biting. as the vat.grab() is called and the vault gets liquidated.
+    should equal urnDTOInitial.Art urnDTOAfterPriceChange.Art
+    should equal urnDTOInitial.Ink urnDTOAfterPriceChange.Ink
+
+    // STEP 2 - bite, current excessCollateral should be within 0-35% of the excess collateral before biting. as the vat.grab() is called and the vault gets liquidated.
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
 
     let urnDTOAfterBite = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
@@ -288,11 +291,15 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let percentTotalCollateral = bigintDifference collateralOutputAfterBite.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral 4
     let percentTotalExcessCollateral = bigintDifference collateralOutputAfterBite.ExcessCollateral collateralOutputAfterPriceChange.ExcessCollateral 4
     let percentCollateralDenominatedDebt = bigintDifference collateralOutputAfterBite.CollateralDenominatedDebt collateralOutputAfterPriceChange.CollateralDenominatedDebt 4
+    let percentArt = bigintDifference urnDTOAfterBite.Art urnDTOAfterPriceChange.Art 4
+    let percentInk = bigintDifference urnDTOAfterBite.Ink urnDTOAfterPriceChange.Ink 4
 
     should lessThanOrEqualTo 35M percentDiff
     should equal percentDiff percentTotalCollateral
     should equal percentDiff percentTotalExcessCollateral
-    should equal percentDiff percentCollateralDenominatedDebt    
+    should equal percentDiff percentCollateralDenominatedDebt
+    should equal percentDiff percentArt
+    should equal percentDiff percentInk
 
     // STEP 3 - open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
@@ -326,4 +333,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     
     let collateralOutputAfterMoveVat = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
     let urnDTOAfterMoveVat = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
-    ()
+
+    should greaterThan urnDTOAfterAuctionEnd.Ink urnDTOAfterMoveVat.Ink
+    should greaterThan urnDTOAfterAuctionEnd.Art urnDTOAfterMoveVat.Art
+
+    should greaterThan collateralOutputAfterAuctionEnd.TotalCollateral collateralOutputAfterMoveVat.TotalCollateral
