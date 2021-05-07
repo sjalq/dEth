@@ -93,7 +93,7 @@ let getDEthContract () =
     let _, contract = getDEthContractAndAuthority ()
     contract
 
-let getMockDSValueFormat priceFormatted =
+let getMockDSValueFormat (priceFormatted:BigInteger) =
     let mockDSValue = makeContract [||] "DSValueMock"
     mockDSValue.ExecuteFunction "setData" [|priceFormatted |] |> ignore
     mockDSValue
