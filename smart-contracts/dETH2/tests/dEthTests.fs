@@ -223,6 +223,9 @@ let bigintDifference a b (precision:int) =
     Math.Round(decimal <| toBigDecimal a / toBigDecimal b, precision)
 
 // todo urns and other vat values checks
+// excessCollateral and the urns values ought to both change as the speeds are executed
+// They should go down after defaulting, they should go up after the auction is complete and they (urns) should be 0 when the recapitalization is complete
+
 
 [<Specification("cdp", "bite", 0)>]
 [<Fact>]
@@ -263,7 +266,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
     // set-up the test - end
 
-    // STEP 1 - change price and check that excess collateral went down after price change
+    // STEP 1 - change price and check that excess collateral went down after price change by the percent that price was divided by.
     let mockDSValueContract = getMockDSValueFormat wantedPriceBigInt
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
 
@@ -283,6 +286,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal urnDTOInitial.Ink urnDTOAfterPriceChange.Ink
 
     // STEP 2 - bite, current excessCollateral should be within 0-35% of the excess collateral before biting. as the vat.grab() is called and the vault gets liquidated.
+    // kick is called, guy is CDP manager vs our account
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
 
     let urnDTOAfterBite = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
@@ -319,10 +323,17 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|] |> shouldSucceed
     flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|] |> shouldSucceed
 
+    // here bids guy should be our account
+    // Vow - 
+    // Flipper.tend moves the bid (DAI) amount to the VOW
+    // Flipper.dent moves avaiable (10%) collateral from flipper to the usr - vault address, bids.lot - lot. (so, it should be 10% of the lot)
+    // Flipper.deal moves remaining (90%) collateral from flipper to bid.guy
+
+
     ethConn.TimeTravel maxAuctionLengthInSeconds
     flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
 
-    // after hope/tend/dent/deal - the values should drop to 35 percents of original or less
+    // after hope/tend/dent/deal - the values should go up. Urns should be zero (both art and ink) and excessCollateral go up.
     // doesn't change
     let urnDTOAfterAuctionEnd = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]    
     let collateralOutputAfterAuctionEnd = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
