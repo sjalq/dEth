@@ -19,7 +19,7 @@ contract VatLike {
         uint256 art);  // Normalised Debt    [wad]);
 
     mapping (bytes32 => mapping (address => uint)) public gem;  // [wad]
-    //mapping (bytes32 => mapping (address => Urn )) public urns;
+
     function grab(bytes32,address,address,address,int256,int256) external;
     function hope(address) external;
     function nope(address) external;

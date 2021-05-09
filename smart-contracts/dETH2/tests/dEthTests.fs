@@ -285,11 +285,14 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal urnDTOInitial.Art urnDTOAfterPriceChange.Art
     should equal urnDTOInitial.Ink urnDTOAfterPriceChange.Ink
 
+    let gemAmountBeforeBite = vatContract.Query<bigint> "gem" [|ilk; urn|]
+
     // STEP 2 - bite, current excessCollateral should be within 0-35% of the excess collateral before biting. as the vat.grab() is called and the vault gets liquidated.
     // kick is called, guy is CDP manager vs our account
     catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
 
     let urnDTOAfterBite = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
+    let gemAmountAfterBite = vatContract.Query<bigint> "gem" [|ilk; urn|]
     let collateralOutputAfterBite = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
     let percentDiff = bigintDifference collateralOutputAfterBite.Debt collateralOutputAfterPriceChange.Debt 4
     let percentTotalCollateral = bigintDifference collateralOutputAfterBite.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral 4
@@ -304,6 +307,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal percentDiff percentCollateralDenominatedDebt
     should equal percentDiff percentArt
     should equal percentDiff percentInk
+    should equal gemAmountBeforeBite gemAmountAfterBite
 
     // STEP 3 - open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
@@ -324,19 +328,31 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|] |> shouldSucceed
 
     // here bids guy should be our account
-    // Vow - 
     // Flipper.tend moves the bid (DAI) amount to the VOW
-    // Flipper.dent moves avaiable (10%) collateral from flipper to the usr - vault address, bids.lot - lot. (so, it should be 10% of the lot)
+    // Flipper.dent moves avaiable (10%) collateral from flipper to the usr - vault address, bids.lot - lot. (so, it should be 10% of the lot). It impacts gem mapping, but in the test we are quering urns.
     // Flipper.deal moves remaining (90%) collateral from flipper to bid.guy
+    // bug ? - flux - transfers collateral between users, but doesn't update Urn.ink
+    // but - it goes to the owner of the vault vs the vault itself (which makes sense as it's being liquidated)
 
+    // retrieve the bids data before calling deal, because it is removed during deal execution.
+    let bidsOutputDTOAfterAuction = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
 
+    // end the auction
     ethConn.TimeTravel maxAuctionLengthInSeconds
     flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
 
-    // after hope/tend/dent/deal - the values should go up. Urns should be zero (both art and ink) and excessCollateral go up.
-    // doesn't change
-    let urnDTOAfterAuctionEnd = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]    
+    // after hope/tend/dent/deal - the gem amount should go up, collateral and urn shouldn't change. The guy should be hardhat's first account's address.
+    let urnDTOAfterAuctionEnd = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
+    let gemAmountAfterAuctionEnd = vatContract.Query<bigint> "gem" [|ilk; urn|]
     let collateralOutputAfterAuctionEnd = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
+
+    should equal (gemAmountAfterBite + (bidsOutputDTO.Lot - bidsOutputDTOAfterAuction.Lot)) gemAmountAfterAuctionEnd
+    should equal expectedLot bidsOutputDTOAfterAuction.Lot
+    shouldEqualIgnoringCase ethConn.Account.Address bidsOutputDTOAfterAuction.Guy
+
+    should equal collateralOutputAfterBite.ExcessCollateral collateralOutputAfterAuctionEnd.ExcessCollateral
+    should equal urnDTOAfterBite.Art urnDTOAfterAuctionEnd.Art
+    should equal urnDTOAfterBite.Ink urnDTOAfterAuctionEnd.Ink
 
     // STEP 4: MoveVatEthToCDP
     // need to check that vat eth was indeed moved and that excess collateral is up again.
@@ -344,8 +360,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     
     let collateralOutputAfterMoveVat = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
     let urnDTOAfterMoveVat = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
+    let gemAmountAfterMoveVat = vatContract.Query<bigint> "gem" [|ilk; urn|]
 
-    should greaterThan urnDTOAfterAuctionEnd.Ink urnDTOAfterMoveVat.Ink
     should greaterThan urnDTOAfterAuctionEnd.Art urnDTOAfterMoveVat.Art
+    should equal 0 urnDTOAfterMoveVat.Ink
+    should equal 0 gemAmountAfterMoveVat
 
     should greaterThan collateralOutputAfterAuctionEnd.TotalCollateral collateralOutputAfterMoveVat.TotalCollateral
