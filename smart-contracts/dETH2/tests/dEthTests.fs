@@ -310,8 +310,12 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal gemAmountBeforeBite gemAmountAfterBite
 
     // redeem should revert
-    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] (Debug(ethConn))
+    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|ethConn.Account.Address;10|] (Debug(ethConn))
     debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithUnknownMessage
+
+    // squander should revert as well
+    let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] (Debug(ethConn)) |> runNow
+    debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
 
     // STEP 3 - open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
@@ -364,6 +368,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] (Debug(ethConn))
     debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithUnknownMessage
 
+    // squander should revert as well
+    let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] (Debug(ethConn)) |> runNow
+    debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
+
     // STEP 4: MoveVatEthToCDP
     // need to check that vat eth was indeed moved and that excess collateral is up again.
     dEthContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
@@ -381,3 +389,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let address = makeAccount().Address
     dEthContract.ExecuteFunction "redeem" [|address;(collateralOutputAfterMoveVat.TotalCollateral - collateralOutputAfterAuctionEnd.TotalCollateral)|] |> shouldSucceed
     should greaterThan (bigint 0) <| ethConn.GetEtherBalance(address)
+
+    // check that we can squander and that we have received ERC20 tokens
+    dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|address|] ethConn |> runNow |> shouldSucceed
+    should greaterThan (bigint 0) <| dEthContract.Query<bigint> "balanceOf" [|address|]

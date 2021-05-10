@@ -131,14 +131,16 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
     member this.FunctionData functionName arguments = 
         (this.Function functionName).GetData(arguments)
 
-    member this.ExecuteFunctionFromAsync functionName arguments (connection:IAsyncTxSender) = 
-        this.FunctionData functionName arguments |> connection.SendTxAsync this.Address (BigInteger(0))
+    member this.ExecuteFunctionFromAsyncWithValue value functionName arguments (connection:IAsyncTxSender) = 
+        this.FunctionData functionName arguments |> connection.SendTxAsync this.Address value
+
+    member this.ExecuteFunctionFromAsync = this.ExecuteFunctionFromAsyncWithValue (BigInteger(0))
 
     member this.ExecuteFunctionFrom functionName arguments connection = 
         this.ExecuteFunctionFromAsync functionName arguments connection |> runNow
 
     member this.ExecuteFunctionAsync functionName arguments = 
-        this.ExecuteFunctionFromAsync functionName arguments ethConn
+        this.ExecuteFunctionFromAsync functionName arguments (upcast ethConn)
 
     member this.ExecuteFunction functionName arguments = 
         this.ExecuteFunctionAsync functionName arguments |> runNow
