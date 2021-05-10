@@ -362,8 +362,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let urnDTOAfterMoveVat = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
     let gemAmountAfterMoveVat = vatContract.Query<bigint> "gem" [|ilk; urn|]
 
-    should greaterThan urnDTOAfterAuctionEnd.Art urnDTOAfterMoveVat.Art
-    should equal 0 urnDTOAfterMoveVat.Ink
-    should equal 0 gemAmountAfterMoveVat
+    should equal (urnDTOAfterAuctionEnd.Ink + gemAmountAfterAuctionEnd) urnDTOAfterMoveVat.Ink
+    should equal urnDTOAfterAuctionEnd.Art urnDTOAfterMoveVat.Art
+    should equal BigInteger.Zero gemAmountAfterMoveVat
 
     should greaterThan collateralOutputAfterAuctionEnd.TotalCollateral collateralOutputAfterMoveVat.TotalCollateral

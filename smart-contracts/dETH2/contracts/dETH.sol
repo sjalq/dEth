@@ -72,6 +72,11 @@ contract IVAT
         public
         view
         returns(uint256 ink, uint256 art);
+
+    function gem(bytes32 ilk, address owner)
+        public
+        view
+        returns (uint);
 }
 
 contract IMakerManager 
@@ -81,7 +86,6 @@ contract IMakerManager
         view
         returns(IVAT);
         
-
     function ilks(uint256 cdpId)
         public
         view
@@ -528,16 +532,17 @@ contract dEth is
 
         bytes32 ilk = IMakerManager(makerManager).ilks(cdpId);
         address urn = IMakerManager(makerManager).urns(cdpId);
-        (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(ilk, urn);
-        console.log("ink balance", ink);
-        console.log("art balance", art);
+        uint256 unlockedInk = IMakerManager(makerManager).vat().gem(ilk, urn);
+
         console.log("excess collateral 1:", getExcessCollateral());
+
+        console.log("unlocked ink (gem): ", unlockedInk);
 
         bytes memory frobProxyCall = abi.encodeWithSignature(
             "frob(address,uint256,int256,int256)",
             makerManager,
             cdpId,
-            int256(ink),
+            int256(unlockedInk),
             0);
         console.log("frob data");
 
