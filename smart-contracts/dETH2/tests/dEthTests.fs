@@ -249,7 +249,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     // set mock oracle to our dEth to lead to the relevant maker oracle and initialize dEth
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (KissFunction(A=oracleAdapter.Address)) |> ignore
     oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
-    let (_, dEthContract) = getDEthContractFromOracle <| oracleAdapter
+    let (_, dEthContract) = getDEthContractFromOracle oracleAdapter true
 
     // calculate price to make the ratio between total collateral and collateral denominated debt 145%
     let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
@@ -309,6 +309,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal percentDiff percentInk
     should equal gemAmountBeforeBite gemAmountAfterBite
 
+    // redeem should revert
+    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] (Debug(ethConn))
+    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithUnknownMessage
+
     // STEP 3 - open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
     let maxBidLengthInSeconds = bigint 20
@@ -341,7 +345,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     ethConn.TimeTravel maxAuctionLengthInSeconds
     flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
 
-    // after hope/tend/dent/deal - the gem amount should go up, collateral and urn shouldn't change. The guy should be hardhat's first account's address.
+    // after hope/tend/dent/deal - the gem amount should go up, collateral and urn shouldn't change.
+    // The guy should be hardhat's first account's address.
+    // We shouldn't be able to redeem.
     let urnDTOAfterAuctionEnd = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
     let gemAmountAfterAuctionEnd = vatContract.Query<bigint> "gem" [|ilk; urn|]
     let collateralOutputAfterAuctionEnd = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
@@ -354,6 +360,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal urnDTOAfterBite.Art urnDTOAfterAuctionEnd.Art
     should equal urnDTOAfterBite.Ink urnDTOAfterAuctionEnd.Ink
 
+    // redeem should revert
+    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] (Debug(ethConn))
+    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithUnknownMessage
+
     // STEP 4: MoveVatEthToCDP
     // need to check that vat eth was indeed moved and that excess collateral is up again.
     dEthContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
@@ -365,5 +375,9 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal (urnDTOAfterAuctionEnd.Ink + gemAmountAfterAuctionEnd) urnDTOAfterMoveVat.Ink
     should equal urnDTOAfterAuctionEnd.Art urnDTOAfterMoveVat.Art
     should equal BigInteger.Zero gemAmountAfterMoveVat
-
     should greaterThan collateralOutputAfterAuctionEnd.TotalCollateral collateralOutputAfterMoveVat.TotalCollateral
+
+    // STEP 5: check that we can redeem and that the account has ether after the redeem call
+    let address = makeAccount().Address
+    dEthContract.ExecuteFunction "redeem" [|address;(collateralOutputAfterMoveVat.TotalCollateral - collateralOutputAfterAuctionEnd.TotalCollateral)|] |> shouldSucceed
+    should greaterThan (bigint 0) <| ethConn.GetEtherBalance(address)

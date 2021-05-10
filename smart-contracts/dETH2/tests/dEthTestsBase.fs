@@ -75,7 +75,9 @@ let initOraclesDefault percentDiffNormalized =
 
     decimal priceMaker, decimal priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
 
-let getDEthContractFromOracle (oracleContract:ContractPlug) =     
+let getDEthContractFromOracle (oracleContract:ContractPlug) (initialRecipientIsTestAccount) =     
+    let initialRecipient = if initialRecipientIsTestAccount then ethConn.Account.Address else initialRecipient
+
     let contract = makeContract [|
         gulper;proxyCache;cdpId;makerManager;ethGemJoin;
         saverProxy;saverProxyActions;oracleContract.Address;
@@ -87,7 +89,7 @@ let getDEthContractFromOracle (oracleContract:ContractPlug) =
     authority, contract
 
 let getDEthContractAndAuthority () = 
-    getDEthContractFromOracle oracleContractMainnet
+    getDEthContractFromOracle oracleContractMainnet false
 
 let getDEthContract () = 
     let _, contract = getDEthContractAndAuthority ()
