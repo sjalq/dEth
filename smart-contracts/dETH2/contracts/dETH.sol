@@ -86,6 +86,11 @@ contract IMakerManager
         public
         view
         returns(bytes32 ilk);
+
+    function urns (uint cdpId) 
+        public 
+        view
+        returns(address);      // CDPId => UrnHandler        
 }
 
 contract Oracle
@@ -513,7 +518,8 @@ contract dEth is
         // *frob that value back into the cdp
 
         bytes32 ilk = IMakerManager(makerManager).ilks(cdpId);
-        (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(ilk, address(this));
+        address urn = IMakerManager(makerManager).urns(cdpId);
+        (uint256 ink, uint256 art) = IMakerManager(makerManager).vat().urns(ilk, urn);
         console.log("ink balance", ink);
         console.log("art balance", art);
         console.log("excess collateral 1:", getExcessCollateral());
@@ -522,14 +528,14 @@ contract dEth is
             "frob(address,uint256,int256,int256)",
             makerManager,
             cdpId,
-            0,
-            int256(ink));
+            int256(ink),
+            0);
         console.log("frob data");
 
         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
         console.log("frobbed");
 
-        (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(ilk, address(this));
+        (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(ilk, urn);
         console.log("ink1 balance", ink1);
         console.log("art1 balance", art1);
 
