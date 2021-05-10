@@ -178,6 +178,7 @@ contract dEth is
     // automation variables
     uint public minRedemptionRatio;
     uint public automationFeePerc;
+    uint public riskLimit; //sets the maximum amount of Eth the contract will risk, can also be used to retire the contract by setting it to 0
     
     constructor(
             address payable _gulper,
@@ -208,7 +209,9 @@ contract dEth is
         saverProxyActions = _saverProxyActions;
         oracle = _oracle;
         minRedemptionRatio = 160;
-        automationFeePerc = ONE_PERC;           //   1.0%
+        automationFeePerc = ONE_PERC;           // 1.0%
+        riskLimit = 2000*10**18;      // sets an initial limit of 2000 ETH that the contract will risk. 
+
         
         uint excess = getExcessCollateral();
         console.log("Excess colateral: ", excess);
@@ -338,6 +341,8 @@ contract dEth is
         // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
 
+        require(getExcessCollateral() < riskLimit, "risk limit exceeded");
+
         (uint protocolFee, 
         uint automationFee, 
         uint collateralToLock, 
@@ -448,7 +453,8 @@ contract dEth is
             uint _targetRatio,
             uint _boostRatio,
             uint _minRedemptionRatio,
-            uint _automationFeePerc);
+            uint _automationFeePerc,
+            uint _riskLimit);
 
     // note: all values used by defisaver are in WAD format
     // we do not need that level of precision on this method
@@ -458,7 +464,8 @@ contract dEth is
             uint _targetRatio,
             uint _boostRatio,
             uint _minRedemptionRatio,
-            uint _automationFeePerc)
+            uint _automationFeePerc,
+            uint _riskLimit)
         public
         auth
     {
@@ -478,6 +485,7 @@ contract dEth is
 
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
+        riskLimit = _riskLimit;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
@@ -496,7 +504,8 @@ contract dEth is
             _targetRatio,
             _boostRatio,
             minRedemptionRatio,
-            automationFeePerc);
+            automationFeePerc,
+            riskLimit);
     }
 
     function moveVatEthToCDP()
