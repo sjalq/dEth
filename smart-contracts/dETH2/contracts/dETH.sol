@@ -218,7 +218,6 @@ contract dEth is
 
         
         uint excess = getExcessCollateral();
-        console.log("Excess colateral: ", excess);
         _mint(_initialRecipient, excess);
 
         // set the relevant authorities to make sure the parameters can be adjusted later on
@@ -263,6 +262,7 @@ contract dEth is
         returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
         _priceRAY = getCollateralPriceRAY();
+<<<<<<< HEAD
         console.log("Price RAY: ", _priceRAY);
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         console.log("_totalCollateral: ", _totalCollateral);
@@ -271,6 +271,11 @@ contract dEth is
         console.log("_collateralDenominatedDebt: ", _collateralDenominatedDebt);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
         console.log("_excessCollateral: ", _excessCollateral);
+=======
+        (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
+        _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
+        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);                      
+>>>>>>> a9f1ba4... removed moveVatEthToCDP and all console.logs
     }
 
     function getCollateralPriceRAY()
@@ -484,8 +489,9 @@ contract dEth is
         //     bool _nextPriceEnabled, 
         //     address _subscriptions) 
 
+        // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
-        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
+        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
@@ -510,6 +516,7 @@ contract dEth is
             automationFeePerc,
             riskLimit);
     }
+<<<<<<< HEAD
 
     function moveVatEthToCDP()
         public
@@ -556,4 +563,6 @@ contract dEth is
     }
     
     function () external payable { }
+=======
+>>>>>>> a9f1ba4... removed moveVatEthToCDP and all console.logs
 }
