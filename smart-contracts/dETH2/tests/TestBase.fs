@@ -75,12 +75,12 @@ type EthereumConnection(nodeURI: string, privKey: string) =
             null, 
             arguments)
                 
-    member this.TimeTravel seconds = 
+    member this.TimeTravel seconds =
         this.Web3.Client.SendRequestAsync(method = "evm_increaseTime", paramList = [| seconds |]) 
-        |> Async.AwaitTask 
+        |> Async.AwaitTask
         |> Async.RunSynchronously
         this.Web3.Client.SendRequestAsync(method = "evm_mine", paramList = [||]) 
-        |> Async.AwaitTask 
+        |> Async.AwaitTask
         |> Async.RunSynchronously
 
     member this.GetEtherBalance address = 

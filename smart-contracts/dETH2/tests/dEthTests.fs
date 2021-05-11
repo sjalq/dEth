@@ -251,6 +251,10 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
     let (_, dEthContract) = getDEthContractFromOracle oracleAdapter true
 
+    // transfer some tokens to the debug account so we can call functions that rely on the token balance from it
+    let debugTransferAmount = 10
+    dEthContract.ExecuteFunction "transfer" [|debug.ContractPlug.Address;debugTransferAmount|] |> shouldSucceed
+
     // calculate price to make the ratio between total collateral and collateral denominated debt 145%
     let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
     let collateralOutputInitial = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
@@ -310,12 +314,12 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal gemAmountBeforeBite gemAmountAfterBite
 
     // redeem should revert
-    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|ethConn.Account.Address;10|] (Debug(ethConn))
-    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithUnknownMessage
+    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|ethConn.Account.Address;10|] debug
+    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithMessage "cannot violate collateral safety ratio"
 
     // squander should revert as well
-    let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] (Debug(ethConn)) |> runNow
-    debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
+    //let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] debug |> runNow
+    //debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
 
     // STEP 3 - open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
@@ -365,12 +369,12 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should equal urnDTOAfterBite.Ink urnDTOAfterAuctionEnd.Ink
 
     // redeem should revert
-    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] (Debug(ethConn))
-    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithUnknownMessage
+    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] debug
+    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithMessage "cannot violate collateral safety ratio"
 
     // squander should revert as well
-    let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] (Debug(ethConn)) |> runNow
-    debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
+    //let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] debug |> runNow
+    //debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
 
     // STEP 4: MoveVatEthToCDP
     // need to check that vat eth was indeed moved and that excess collateral is up again.

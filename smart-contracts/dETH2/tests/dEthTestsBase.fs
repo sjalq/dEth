@@ -59,13 +59,13 @@ let toMakerPriceFormat = decimal >> toMakerPriceFormatDecimal
 let toChainLinkPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 8.0))).Mantissa
 let toChainLinkPriceFormatInt (a:int) = toChainLinkPriceFormatDecimal <| decimal a
 
-let initOracles priceMaker priceDaiUsd priceEthUsd = 
+let initOracles priceMaker priceDaiUsd priceEthUsd =
     makerOracle.ExecuteFunction "setData" [|toMakerPriceFormat priceMaker|] |> ignore
     daiUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceDaiUsd|] |> ignore
     ethUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceEthUsd|] |> ignore
 
 // percent is normalized to range [0, 1]
-let initOraclesDefault percentDiffNormalized = 
+let initOraclesDefault percentDiffNormalized =
     let priceMaker = 10 // can be random value
     let priceDaiUsd = 5 // can be random value
     let priceNonMakerDaiEth = (decimal priceMaker + (decimal priceMaker) * percentDiffNormalized)
@@ -75,7 +75,7 @@ let initOraclesDefault percentDiffNormalized =
 
     decimal priceMaker, decimal priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
 
-let getDEthContractFromOracle (oracleContract:ContractPlug) (initialRecipientIsTestAccount) =     
+let getDEthContractFromOracle (oracleContract:ContractPlug) initialRecipientIsTestAccount =
     let initialRecipient = if initialRecipientIsTestAccount then ethConn.Account.Address else initialRecipient
 
     let contract = makeContract [|
