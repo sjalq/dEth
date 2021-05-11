@@ -200,7 +200,6 @@ contract dEth is
         automationFeePerc = ONE_PERC;           //   1.0%
         
         uint excess = getExcessCollateral();
-        console.log("Excess colateral: ", excess);
         _mint(_initialRecipient, excess);
 
         // set the relevant authorities to make sure the parameters can be adjusted later on
@@ -230,16 +229,13 @@ contract dEth is
         public
         auth
     {
-        console.log("0");
         bytes memory giveProxyCall = abi.encodeWithSignature(
             "give(address,uint256,address)", 
             makerManager, 
             cdpId, 
             _dsProxy);
         
-        console.log("1");
         IDSProxy(address(this)).execute(saverProxyActions, giveProxyCall);
-        console.log("2");
     }
 
     function getCollateral()
@@ -250,13 +246,7 @@ contract dEth is
         _priceRAY = getCollateralPriceRAY();
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
-        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
-        console.log("Price RAY: ", _priceRAY);
-        console.log("_totalCollateral: ", _totalCollateral);
-        console.log("_debt: ", _debt);
-        console.log("_collateralDenominatedDebt: ", _collateralDenominatedDebt);
-        console.log("_totalCollateral: ", _totalCollateral);
-        console.log("_excessCollateral: ", _excessCollateral);                        
+        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);                      
     }
 
     function getCollateralPriceRAY()
@@ -466,8 +456,9 @@ contract dEth is
         //     bool _nextPriceEnabled, 
         //     address _subscriptions) 
 
+        // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
-        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
+        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
@@ -491,36 +482,4 @@ contract dEth is
             minRedemptionRatio,
             automationFeePerc);
     }
-
-    function moveVatEthToCDP()
-        public
-    {
-        // for reference - this function is called on the MakerManager
-        // function wipeAndFreeETH(
-        //     address manager,
-        //     uint cdp,
-        //     int256 dart, // change in debt, chould be 0
-        //     int256 dink  // change in collateral, should be the entire balance available for the urn owner
-        // )
-
-        // goal :
-        // 1. get the ether in the urn for this cdp, back into the cdp itself
-
-        // logic :
-        // *look up the balance of the urn
-        // *frob that value back into the cdp
-
-        uint256 urnBalance = IMakerManager(makerManager).VAT().urns(bytes32(cdpId), address(this));
-
-        bytes memory frobProxyCall = abi.encodeWithSignature(
-            "frob(address,uint256,int256,int256)",
-            makerManager,
-            cdpId,
-            0,
-            int256(urnBalance));
-
-        IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
-    }
-    
-    function () external payable { }
 }
