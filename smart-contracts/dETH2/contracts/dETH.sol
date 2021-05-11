@@ -11,6 +11,7 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./DSMath.sol";
 import "./DSProxy.sol";
+import "./console.sol";
 
 contract IDSGuard is DSAuthority
 {
@@ -45,6 +46,18 @@ contract IChainLinkPriceOracle
             uint80 answeredInRound);
 }
 
+contract IPriceFeed
+{
+    function post(uint128 val_, uint32 zzz_, address med_) public;
+}
+
+contract IMedianETHUSD
+{
+    function poke(
+    uint256[] calldata val_, uint256[] calldata age_,
+    uint8[] calldata v, bytes32[] calldata r, bytes32[] calldata s) external;
+}
+
 contract IMakerOracle
 {
     function read()
@@ -55,18 +68,33 @@ contract IMakerOracle
 
 contract IVAT
 {
-    function urns(bytes32 cdp, address owner)
+    function urns(bytes32 ilk, address owner)
         public
         view
-        returns(uint256);
+        returns(uint256 ink, uint256 art);
+
+    function gem(bytes32 ilk, address owner)
+        public
+        view
+        returns (uint);
 }
 
 contract IMakerManager 
 {
-    function VAT()
+    function vat()
         public
         view
         returns(IVAT);
+        
+    function ilks(uint256 cdpId)
+        public
+        view
+        returns(bytes32 ilk);
+
+    function urns (uint cdpId) 
+        public 
+        view
+        returns(address);      // CDPId => UrnHandler        
 }
 
 contract Oracle
@@ -81,8 +109,8 @@ contract Oracle
     IChainLinkPriceOracle public ethUsdOracle;
 
     constructor (
-            IMakerOracle _makerOracle,
-            IChainLinkPriceOracle _daiUsdOracle,
+            IMakerOracle _makerOracle, 
+            IChainLinkPriceOracle _daiUsdOracle, 
             IChainLinkPriceOracle _ethUsdOracle) 
         public
     {
@@ -154,6 +182,7 @@ contract dEth is
     // automation variables
     uint public minRedemptionRatio;
     uint public automationFeePerc;
+    uint public riskLimit; //sets the maximum amount of Eth the contract will risk, can also be used to retire the contract by setting it to 0
     
     constructor(
             address payable _gulper,
@@ -184,9 +213,13 @@ contract dEth is
         saverProxyActions = _saverProxyActions;
         oracle = _oracle;
         minRedemptionRatio = 160;
-        automationFeePerc = ONE_PERC;           //   1.0%
+        automationFeePerc = ONE_PERC;           // 1.0%
+        riskLimit = 2000*10**18;      // sets an initial limit of 2000 ETH that the contract will risk. 
+
         
-        _mint(_initialRecipient, getExcessCollateral());
+        uint excess = getExcessCollateral();
+        console.log("Excess colateral: ", excess);
+        _mint(_initialRecipient, excess);
 
         // set the relevant authorities to make sure the parameters can be adjusted later on
         IDSGuard guard = IDSGuardFactory(_DSGuardFactory).newGuard();
@@ -230,9 +263,14 @@ contract dEth is
         returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
         _priceRAY = getCollateralPriceRAY();
+        console.log("Price RAY: ", _priceRAY);
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
+        console.log("_totalCollateral: ", _totalCollateral);
+        console.log("_debt: ", _debt);
         _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
+        console.log("_collateralDenominatedDebt: ", _collateralDenominatedDebt);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
+        console.log("_excessCollateral: ", _excessCollateral);
     }
 
     function getCollateralPriceRAY()
@@ -306,6 +344,8 @@ contract dEth is
         // Goals:
         // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
+
+        require(getExcessCollateral() < riskLimit, "risk limit exceeded");
 
         (uint protocolFee, 
         uint automationFee, 
@@ -417,7 +457,8 @@ contract dEth is
             uint _targetRatio,
             uint _boostRatio,
             uint _minRedemptionRatio,
-            uint _automationFeePerc);
+            uint _automationFeePerc,
+            uint _riskLimit);
 
     // note: all values used by defisaver are in WAD format
     // we do not need that level of precision on this method
@@ -427,7 +468,8 @@ contract dEth is
             uint _targetRatio,
             uint _boostRatio,
             uint _minRedemptionRatio,
-            uint _automationFeePerc)
+            uint _automationFeePerc,
+            uint _riskLimit)
         public
         auth
     {
@@ -447,6 +489,7 @@ contract dEth is
 
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
+        riskLimit = _riskLimit;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
@@ -465,7 +508,8 @@ contract dEth is
             _targetRatio,
             _boostRatio,
             minRedemptionRatio,
-            automationFeePerc);
+            automationFeePerc,
+            riskLimit);
     }
 
     function moveVatEthToCDP()
@@ -486,16 +530,30 @@ contract dEth is
         // *look up the balance of the urn
         // *frob that value back into the cdp
 
-        uint256 urnBalance = IMakerManager(makerManager).VAT().urns(bytes32(cdpId), address(this));
+        bytes32 ilk = IMakerManager(makerManager).ilks(cdpId);
+        address urn = IMakerManager(makerManager).urns(cdpId);
+        uint256 unlockedInk = IMakerManager(makerManager).vat().gem(ilk, urn);
+
+        console.log("excess collateral 1:", getExcessCollateral());
+
+        console.log("unlocked ink (gem): ", unlockedInk);
 
         bytes memory frobProxyCall = abi.encodeWithSignature(
             "frob(address,uint256,int256,int256)",
             makerManager,
             cdpId,
-            0,
-            int256(urnBalance));
+            int256(unlockedInk),
+            0);
+        console.log("frob data");
 
         IDSProxy(address(this)).execute(saverProxyActions, frobProxyCall);
+        console.log("frobbed");
+
+        (uint256 ink1, uint256 art1) = IMakerManager(makerManager).vat().urns(ilk, urn);
+        console.log("ink1 balance", ink1);
+        console.log("art1 balance", art1);
+
+        console.log("excess collateral 2:", getExcessCollateral());
     }
     
     function () external payable { }

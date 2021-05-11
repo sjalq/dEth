@@ -1,5 +1,7 @@
 pragma solidity ^0.5.17;
 
+import "./console.sol";
+
 contract DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool);
 }
@@ -102,7 +104,9 @@ contract DSProxy is DSAuth, DSNote {
         note
         returns (bytes32 response)
     {
+        console.log("2");
         require(_target != address(0));
+        console.log("3");
 
         
         assembly {
@@ -114,10 +118,10 @@ contract DSProxy is DSAuth, DSNote {
                 0,
                 32
             )
-            response := mload(0) 
+            response := mload(0)
             switch iszero(succeeded)
-                case 1 {
-                    
+                case 1 
+                {
                     revert(0, 0)
                 }
         }

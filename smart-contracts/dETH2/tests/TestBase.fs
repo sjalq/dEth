@@ -18,6 +18,7 @@ open Constants
 open Foundry.Contracts.Debug.ContractDefinition
 open System.Threading.Tasks
 open Nethereum.Web3.Accounts
+open System.Threading
 
 let rnd = Random()
 
@@ -30,10 +31,13 @@ let rec rndRange min max  =
 let bigInt (value: uint64) = BigInteger(value)
 let hexBigInt (value: uint64) = HexBigInteger(bigInt value)
 
-let runNow (task:Task<'T>) =
+let inline runNow task =
     task
     |> Async.AwaitTask
     |> Async.RunSynchronously
+
+let inline runNowWithoutResult (task:Task) =
+    task |> Async.AwaitTask |> Async.RunSynchronously
 
 type Abi(filename) =
     member val JsonString = File.OpenText(filename).ReadToEnd()
@@ -44,8 +48,8 @@ type IAsyncTxSender =
     abstract member SendTxAsync : string -> BigInteger -> string -> Task<TransactionReceipt>
 
 type EthereumConnection(nodeURI: string, privKey: string) =
-    member val public Gas = hexBigInt 4000000UL
-    member val public GasPrice = hexBigInt 1000000000UL
+    member val public Gas = hexBigInt 9500000UL
+    member val public GasPrice = hexBigInt 8000000000UL
     member val public Account = Accounts.Account(privKey)
     member val public Web3 = Web3(Accounts.Account(privKey), nodeURI)
 
@@ -69,14 +73,14 @@ type EthereumConnection(nodeURI: string, privKey: string) =
             this.Gas, this.GasPrice, 
             hexBigInt 0UL, 
             null, 
-            arguments)  
+            arguments)
                 
-    member this.TimeTravel seconds = 
+    member this.TimeTravel seconds =
         this.Web3.Client.SendRequestAsync(method = "evm_increaseTime", paramList = [| seconds |]) 
-        |> Async.AwaitTask 
+        |> Async.AwaitTask
         |> Async.RunSynchronously
         this.Web3.Client.SendRequestAsync(method = "evm_mine", paramList = [||]) 
-        |> Async.AwaitTask 
+        |> Async.AwaitTask
         |> Async.RunSynchronously
 
     member this.GetEtherBalance address = 
@@ -86,7 +90,7 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member this.SendEtherAsync address (amount:BigInteger) =
         let transactionInput =
             TransactionInput
-                ("", address, this.Account.Address, hexBigInt 4000000UL, hexBigInt 1000000000UL, HexBigInteger(amount))
+                ("", address, this.Account.Address, hexBigInt 9500000UL, hexBigInt 1000000000UL, HexBigInteger(amount))
         this.Web3.Eth.TransactionManager.SendTransactionAndWaitForReceiptAsync(transactionInput, null)
 
     member this.SendEther address amount =
@@ -108,7 +112,7 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
 
     member val public Contract = 
         ethConn.Web3.Eth.GetContract(abi.AbiString, address)
-        
+
     member this.Function functionName = 
         this.Contract.GetFunction(functionName)
 
@@ -127,18 +131,36 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
     member this.FunctionData functionName arguments = 
         (this.Function functionName).GetData(arguments)
 
-    member this.ExecuteFunctionFromAsync functionName arguments (connection:IAsyncTxSender) = 
-        this.FunctionData functionName arguments |> connection.SendTxAsync this.Address (BigInteger(0))
+    member this.ExecuteFunctionFromAsyncWithValue value functionName arguments (connection:IAsyncTxSender) = 
+        this.FunctionData functionName arguments |> connection.SendTxAsync this.Address value
+
+    member this.ExecuteFunctionFromAsync = this.ExecuteFunctionFromAsyncWithValue (BigInteger(0))
 
     member this.ExecuteFunctionFrom functionName arguments connection = 
         this.ExecuteFunctionFromAsync functionName arguments connection |> runNow
 
     member this.ExecuteFunctionAsync functionName arguments = 
-        this.ExecuteFunctionFromAsync functionName arguments ethConn
+        this.ExecuteFunctionFromAsync functionName arguments (upcast ethConn)
 
     member this.ExecuteFunction functionName arguments = 
         this.ExecuteFunctionAsync functionName arguments |> runNow
-            
+
+(*
+  console.log:
+    result of reading 3429740000000000000000
+    Price RAY:  3429740000000000000000000000000
+    _totalCollateral:  71638314300090806328
+    _debt:  116825771461731288902718
+    _collateralDenominatedDebt:  34062573682474849086
+    _excessCollateral:  37575740617615957242
+
+    result of reading 150000000000000000
+    Price RAY:  150000000000000000000000000
+    _totalCollateral:  44505286405029419769
+    _debt:  72577983851111819876169
+    _collateralDenominatedDebt:  483853225674078799174460
+*)
+
 
 type Debug(ethConn: EthereumConnection) =
     member val public EthConn = ethConn
@@ -169,7 +191,7 @@ type ForwardedEventDTO with
         | true -> None
         | _ -> Some(Encoding.ASCII.GetString(this.ResultData))
 
-[<System.AttributeUsage(AttributeTargets.Method, AllowMultiple = true)>]
+[<AttributeUsage(AttributeTargets.Method, AllowMultiple = true)>]
 type SpecificationAttribute(contractName, functionName, specCode) =
     inherit Attribute()
     member _.ContractName: string = contractName
@@ -181,6 +203,7 @@ let hardhatURI = "http://localhost:8545"
 let rinkebyURI = "https://rinkeby.infura.io/v3/c48bc466281c4fefb3decad63c4fc815"
 let ganacheMnemonic = "join topple vapor pepper sell enter isolate pact syrup shoulder route token"
 let hardhatPrivKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+let hardhatPrivKey2 = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 let rinkebyPrivKey = "5ca35a65adbd49af639a3686d7d438dba1bcef97cf1593cd5dd8fd79ca89fa3c"
 
 let isRinkeby rinkeby notRinkeby =
@@ -220,6 +243,18 @@ let makeAccount() =
     let privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
     Account(privateKey);
 
+let getABI str = Abi(__SOURCE_DIRECTORY__ + (sprintf "/../build/contracts/%s.json" str))
+
+let makeContract parameters contractName =
+    let abi = getABI contractName
+    let tx = ethConn.DeployContractAsync abi parameters |> runNow
+    ContractPlug(ethConn, abi, tx.ContractAddress)
+
+let padAddress (address:string) = 
+    let addressWithout0x = address.Remove(0, 2)
+    let bytesToPad = (32 - addressWithout0x.Length / 2)
+    
+    (Array.replicate (bytesToPad * 2) '0' |> String) + addressWithout0x
 
 let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
 let bucketPeriod = 7UL * hours |> BigInteger
