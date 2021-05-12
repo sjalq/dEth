@@ -4,10 +4,11 @@ open TestBase
 open Nethereum.Util
 open System.Numerics
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
-open Nethereum.Contracts
-open Nethereum.Web3
 open DETH2.Contracts.VatLike.ContractDefinition
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
+open Nethereum.JsonRpc.Client
+
+type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFunction
 
 module Array = 
     let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
@@ -37,6 +38,9 @@ let vat = "0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
 let spot = "0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3"
 let ilk = "ETH-A"
 let ilkPIPAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
+let ilkFlipper = "0xF32836B9E1f47a0515c6Ec431592D5EbC276407f"
+let ilkFlipperAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
+let daiMainnet = "0x6b175474e89094c44da98b954eedeac495271d0f"
 
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 
@@ -49,7 +53,6 @@ let ethUsdMainnet = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
 let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
 let oracleContractMainnet = makeOracle makerOracleMainnet daiUsdMainnet ethUsdMainnet
 
-// 18 places
 let toMakerPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 18.0))).Mantissa
 let toMakerPriceFormat = decimal >> toMakerPriceFormatDecimal
 
@@ -57,13 +60,13 @@ let toMakerPriceFormat = decimal >> toMakerPriceFormatDecimal
 let toChainLinkPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 8.0))).Mantissa
 let toChainLinkPriceFormatInt (a:int) = toChainLinkPriceFormatDecimal <| decimal a
 
-let initOracles priceMaker priceDaiUsd priceEthUsd = 
+let initOracles priceMaker priceDaiUsd priceEthUsd =
     makerOracle.ExecuteFunction "setData" [|toMakerPriceFormat priceMaker|] |> ignore
     daiUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceDaiUsd|] |> ignore
     ethUsdOracle.ExecuteFunction "setData" [|toChainLinkPriceFormatDecimal priceEthUsd|] |> ignore
 
 // percent is normalized to range [0, 1]
-let initOraclesDefault percentDiffNormalized = 
+let initOraclesDefault percentDiffNormalized =
     let priceMaker = 10 // can be random value
     let priceDaiUsd = 5 // can be random value
     let priceNonMakerDaiEth = (decimal priceMaker + (decimal priceMaker) * percentDiffNormalized)
@@ -73,7 +76,9 @@ let initOraclesDefault percentDiffNormalized =
 
     decimal priceMaker, decimal priceDaiUsd, priceNonMakerDaiEth, priceEthUsd
 
-let getDEthContractFromOracle (oracleContract:ContractPlug) =     
+let getDEthContractFromOracle (oracleContract:ContractPlug) initialRecipientIsTestAccount =
+    let initialRecipient = if initialRecipientIsTestAccount then ethConn.Account.Address else initialRecipient
+
     let contract = makeContract [|
         gulper;proxyCache;cdpId;makerManager;ethGemJoin;
         saverProxy;saverProxyActions;oracleContract.Address;
@@ -85,16 +90,24 @@ let getDEthContractFromOracle (oracleContract:ContractPlug) =
     authority, contract
 
 let getDEthContractAndAuthority () = 
-    getDEthContractFromOracle oracleContractMainnet
+    getDEthContractFromOracle oracleContractMainnet false
 
 let getDEthContract () = 
     let _, contract = getDEthContractAndAuthority ()
     contract
 
-let getMockDSValue price = 
+let getDEthContractEthConn () =
+    let _, contract = getDEthContractFromOracle oracleContractMainnet true
+    do ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
+    do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> ignore
+    contract    
+
+let getMockDSValueFormat (priceFormatted:BigInteger) =
     let mockDSValue = makeContract [||] "DSValueMock"
-    mockDSValue.ExecuteFunction "setData" [|toMakerPriceFormat price |] |> ignore
+    mockDSValue.ExecuteFunction "setData" [|priceFormatted |] |> ignore
     mockDSValue
+
+let getMockDSValue price = toMakerPriceFormat price |> getMockDSValueFormat
 
 let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProxy (cdpId:bigint) =
     let priceEthDai = (oracleContract.Query<bigint> "getEthDaiPrice") [||]
@@ -105,16 +118,6 @@ let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProx
     let excessCollateral = cdpDetailedInfoOutput.Collateral - collateralDenominatedDebt
 
     (priceEthDai, priceRay, saverProxy, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral)
-
-let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
-    let txInput = functionArgs.CreateTransactionInput(addressTo)
-    
-    txInput.From <- addressfrom
-    txInput.Gas <- hexBigInt 9500000UL
-    txInput.GasPrice <- hexBigInt 0UL
-    txInput.Value <- hexBigInt 0UL
-
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
 
 let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
         let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
@@ -143,3 +146,15 @@ let findActiveCDP ilkArg =
 let pokePIP pipAddress = 
     do ethConn.TimeTravel <| Constants.hours * 2UL
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
+
+let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
+    let protocolFeePercent = bigint 9 * BigInteger.Pow(bigint 10, 15)
+    let hundredPerc = BigInteger.Pow(bigint 10, 18) 
+    let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
+    let collateralAffected = excessCollateral * redeemTokenSupplyPerc / hundredPerc
+    let protocolFee = collateralAffected * protocolFeePercent / hundredPerc
+    let automationFee = collateralAffected * automationFeePerc / hundredPerc;
+    let collateralRedeemed = collateralAffected - automationFee; // how much capital should exit the dEth contract
+    let collateralReturned = collateralAffected - protocolFee - automationFee;
+
+    (protocolFee, automationFee, collateralRedeemed, collateralReturned)

@@ -75,12 +75,12 @@ type EthereumConnection(nodeURI: string, privKey: string) =
             null, 
             arguments)
                 
-    member this.TimeTravel seconds = 
+    member this.TimeTravel seconds =
         this.Web3.Client.SendRequestAsync(method = "evm_increaseTime", paramList = [| seconds |]) 
-        |> Async.AwaitTask 
+        |> Async.AwaitTask
         |> Async.RunSynchronously
         this.Web3.Client.SendRequestAsync(method = "evm_mine", paramList = [||]) 
-        |> Async.AwaitTask 
+        |> Async.AwaitTask
         |> Async.RunSynchronously
 
     member this.GetEtherBalance address = 
@@ -131,18 +131,36 @@ type ContractPlug(ethConn: EthereumConnection, abi: Abi, address) =
     member this.FunctionData functionName arguments = 
         (this.Function functionName).GetData(arguments)
 
-    member this.ExecuteFunctionFromAsync functionName arguments (connection:IAsyncTxSender) = 
-        this.FunctionData functionName arguments |> connection.SendTxAsync this.Address (BigInteger(0))
+    member this.ExecuteFunctionFromAsyncWithValue value functionName arguments (connection:IAsyncTxSender) = 
+        this.FunctionData functionName arguments |> connection.SendTxAsync this.Address value
+
+    member this.ExecuteFunctionFromAsync = this.ExecuteFunctionFromAsyncWithValue (BigInteger(0))
 
     member this.ExecuteFunctionFrom functionName arguments connection = 
         this.ExecuteFunctionFromAsync functionName arguments connection |> runNow
 
     member this.ExecuteFunctionAsync functionName arguments = 
-        this.ExecuteFunctionFromAsync functionName arguments ethConn
+        this.ExecuteFunctionFromAsync functionName arguments (upcast ethConn)
 
     member this.ExecuteFunction functionName arguments = 
         this.ExecuteFunctionAsync functionName arguments |> runNow
-            
+
+(*
+  console.log:
+    result of reading 3429740000000000000000
+    Price RAY:  3429740000000000000000000000000
+    _totalCollateral:  71638314300090806328
+    _debt:  116825771461731288902718
+    _collateralDenominatedDebt:  34062573682474849086
+    _excessCollateral:  37575740617615957242
+
+    result of reading 150000000000000000
+    Price RAY:  150000000000000000000000000
+    _totalCollateral:  44505286405029419769
+    _debt:  72577983851111819876169
+    _collateralDenominatedDebt:  483853225674078799174460
+*)
+
 
 type Debug(ethConn: EthereumConnection) =
     member val public EthConn = ethConn
@@ -238,7 +256,12 @@ let padAddress (address:string) =
     
     (Array.replicate (bytesToPad * 2) '0' |> String) + addressWithout0x
 
-let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
-let bucketPeriod = 7UL * hours |> BigInteger
-let bucketSupply = 50000UL |> BigInteger
-let bucketCount = 1250UL |> BigInteger
+let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
+    let txInput = functionArgs.CreateTransactionInput(addressTo)
+    
+    txInput.From <- addressfrom
+    txInput.Gas <- hexBigInt 9500000UL
+    txInput.GasPrice <- hexBigInt 0UL
+    txInput.Value <- hexBigInt 0UL
+
+    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow

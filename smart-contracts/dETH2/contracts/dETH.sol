@@ -68,18 +68,33 @@ contract IMakerOracle
 
 contract IVAT
 {
-    function urns(bytes32 cdp, address owner)
+    function urns(bytes32 ilk, address owner)
         public
         view
-        returns(uint256);
+        returns(uint256 ink, uint256 art);
+
+    function gem(bytes32 ilk, address owner)
+        public
+        view
+        returns (uint);
 }
 
 contract IMakerManager 
 {
-    function VAT()
+    function vat()
         public
         view
         returns(IVAT);
+        
+    function ilks(uint256 cdpId)
+        public
+        view
+        returns(bytes32 ilk);
+
+    function urns (uint cdpId) 
+        public 
+        view
+        returns(address);      // CDPId => UrnHandler        
 }
 
 contract Oracle
@@ -94,9 +109,9 @@ contract Oracle
     IChainLinkPriceOracle public ethUsdOracle;
 
     constructor (
-            IMakerOracle _makerOracle, // 0x81FE72B5A8d1A857d176C3E7d5Bd2679A9B85763
-            IChainLinkPriceOracle _daiUsdOracle, // 0x7663c5790e1ebf04197245d541279d13f3c2f362
-            IChainLinkPriceOracle _ethUsdOracle) // 0xD45727E3D7405C6Ab3B2b3A57474012e1f998483
+            IMakerOracle _makerOracle, 
+            IChainLinkPriceOracle _daiUsdOracle, 
+            IChainLinkPriceOracle _ethUsdOracle) 
         public
     {
         makerOracle = _makerOracle;
@@ -167,6 +182,7 @@ contract dEth is
     // automation variables
     uint public minRedemptionRatio;
     uint public automationFeePerc;
+    uint public riskLimit; //sets the maximum amount of Eth the contract will risk, can also be used to retire the contract by setting it to 0
     
     constructor(
             address payable _gulper,
@@ -197,7 +213,9 @@ contract dEth is
         saverProxyActions = _saverProxyActions;
         oracle = _oracle;
         minRedemptionRatio = 160;
-        automationFeePerc = ONE_PERC;           //   1.0%
+        automationFeePerc = ONE_PERC;           // 1.0%
+        riskLimit = 2000*10**18;      // sets an initial limit of 2000 ETH that the contract will risk. 
+
         
         uint excess = getExcessCollateral();
         _mint(_initialRecipient, excess);
@@ -246,7 +264,7 @@ contract dEth is
         _priceRAY = getCollateralPriceRAY();
         (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
-        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);                      
+        _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
 
     function getCollateralPriceRAY()
@@ -320,6 +338,8 @@ contract dEth is
         // Goals:
         // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
+
+        require(getExcessCollateral() < riskLimit, "risk limit exceeded");
 
         (uint protocolFee, 
         uint automationFee, 
@@ -431,7 +451,8 @@ contract dEth is
             uint _targetRatio,
             uint _boostRatio,
             uint _minRedemptionRatio,
-            uint _automationFeePerc);
+            uint _automationFeePerc,
+            uint _riskLimit);
 
     // note: all values used by defisaver are in WAD format
     // we do not need that level of precision on this method
@@ -441,7 +462,8 @@ contract dEth is
             uint _targetRatio,
             uint _boostRatio,
             uint _minRedemptionRatio,
-            uint _automationFeePerc)
+            uint _automationFeePerc,
+            uint _riskLimit)
         public
         auth
     {
@@ -462,6 +484,7 @@ contract dEth is
 
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
+        riskLimit = _riskLimit;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
@@ -474,12 +497,12 @@ contract dEth is
             true,
             subscriptions);
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
-
         emit AutomationSettingsChanged(
             _repaymentRatio,
             _targetRatio,
             _boostRatio,
             minRedemptionRatio,
-            automationFeePerc);
+            automationFeePerc,
+            riskLimit);
     }
 }

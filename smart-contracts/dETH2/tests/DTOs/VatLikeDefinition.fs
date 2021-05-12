@@ -21,6 +21,19 @@ open System.Threading
         
         new() = VatLikeDeployment(BYTECODE)
         
+
+
+    [<FunctionOutput>]
+    type GemOutputDTO() =
+        inherit FunctionOutputDTO() 
+            [<Parameter("uint256", "", 1)>]
+            member val public ReturnValue1 = Unchecked.defaultof<BigInteger> with get, set
+        
+    
+    
+    
+    
+    
     [<FunctionOutput>]
     type IlksOutputDTO() =
         inherit FunctionOutputDTO() 
@@ -34,9 +47,7 @@ open System.Threading
             member val public Line = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "dust", 5)>]
             member val public Dust = Unchecked.defaultof<BigInteger> with get, set
-        
-    
-    
+            
     
     [<FunctionOutput>]
     type UrnsOutputDTO() =
@@ -45,7 +56,16 @@ open System.Threading
             member val public Ink = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "art", 2)>]
             member val public Art = Unchecked.defaultof<BigInteger> with get, set
-
+        
+    
+    [<Function("gem", "uint256")>]
+    type GemFunction() = 
+        inherit FunctionMessage()
+    
+            [<Parameter("bytes32", "", 1)>]
+            member val public ReturnValue1 = Unchecked.defaultof<byte[]> with get, set
+            [<Parameter("address", "", 2)>]
+            member val public ReturnValue2 = Unchecked.defaultof<string> with get, set
         
     
     [<Function("grab")>]
@@ -88,6 +108,18 @@ open System.Threading
     
             [<Parameter("address", "", 1)>]
             member val public ReturnValue1 = Unchecked.defaultof<string> with get, set
+        
+    
+    [<Function("suck")>]
+    type SuckFunction() = 
+        inherit FunctionMessage()
+    
+            [<Parameter("address", "u", 1)>]
+            member val public U = Unchecked.defaultof<string> with get, set
+            [<Parameter("address", "v", 2)>]
+            member val public V = Unchecked.defaultof<string> with get, set
+            [<Parameter("uint256", "rad", 3)>]
+            member val public Rad = Unchecked.defaultof<BigInteger> with get, set
         
     
     [<Function("urns", typeof<UrnsOutputDTO>)>]

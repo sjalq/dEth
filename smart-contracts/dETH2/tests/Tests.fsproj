@@ -23,6 +23,8 @@
     <Compile Include="DTOs/VatLikeDefinition.fs"/>
     <Compile Include="DTOs/ISpotterDefinition.fs"/>
     <Compile Include="DTOs/PipLikeDefinition.fs"/>
+    <Compile Include="DTOs/IFlipperDefinition.fs"/>
+    <Compile Include="DTOs/ManagerLikeDefinition.fs"/>
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
     <Compile Include="dEthTestsBase.fs" />
