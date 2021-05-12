@@ -411,7 +411,7 @@ let ``dEth - automate - check that an authorised address can change the automati
 
 [<Specification("dEth", "redeem", 0)>]
 [<Fact>]
-let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` () = 
+let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` () =
     let dEthContract = getDEthContractEthConn ()
     let tokensAmount = bigint 100
 
@@ -422,7 +422,7 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
     let (protocolFee, automationFee, collateralRedeemed, collateralReturned) = calculateRedemptionValue tokensAmount (dEthQuery "totalSupply") (dEthQuery "getExcessCollateral") (dEthQuery "automationFeePerc")
 
     let receiverAddress = makeAccount().Address
-    let tx = dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|] <| EthereumConnection(hardhatURI, hardhatPrivKey2)
+    let tx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|]
 
     tx |> shouldSucceed
     receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturned
@@ -434,3 +434,15 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
     event.CollateralReturned |> should equal collateralReturned
     event.ProtocolFee |> should equal protocolFee
     event.Receiver |> shouldEqualIgnoringCase receiverAddress
+
+[<Specification("dEth", "redeem", 1)>]
+[<Fact>]
+let ``dEth - redeem - check that someone without a balance can never redeem Ether`` () =
+    let dEthContract = getDEthContractEthConn ()    
+    let debug = EthereumConnection(hardhatURI, hardhatPrivKey2) |> Debug
+
+    debug
+    |> dEthContract.ExecuteFunctionFrom "redeem" [|makeAccount().Address;10000|]
+    |> debug.DecodeForwardedEvents
+    |> Seq.head
+    |> shouldRevertWithMessage "ERC20: burn amount exceeds balance"
