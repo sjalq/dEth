@@ -70,7 +70,7 @@ let ``initializes with correct values and rights assigned`` () =
     let authority, contract = getDEthContractAndAuthority()
 
     // check the rights
-    let functionName = Web3.Sha3("automate(uint256,uint256,uint256,uint256,uint256)").Substring(0, 8).HexToByteArray()
+    let functionName = Web3.Sha3("automate(uint256,uint256,uint256,uint256,uint256,uint256)").Substring(0, 8).HexToByteArray()
     let canCall = authority.Query<bool> "canCall" [|foundryTreasury; contract.Address; functionName |]
 
     // check the balance of initialRecipient
@@ -84,7 +84,7 @@ let ``initializes with correct values and rights assigned`` () =
     shouldEqualIgnoringCase saverProxy (contract.Query<string> "saverProxy" [||])
     shouldEqualIgnoringCase saverProxyActions (contract.Query<string> "saverProxyActions" [||])
     shouldEqualIgnoringCase oracleContractMainnet.Address (contract.Query<string> "oracle" [||])
-    should equal true canCall
+    should equal true canCall   
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
 
 [<Specification("dEth", "changeGulper", 0)>]
@@ -405,15 +405,18 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 let ``dEth - automate - check that an authorised address can change the automation settings`` () =   
     let dEthContract = getDEthContractEthConn ()
 
-    let tx = dEthContract.ExecuteFunction "automate" [|one;one;one;one;one;one|]
+    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager) 
+    let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
+    cdpOwner |> shouldEqualIgnoringCase dEthContract.Address
 
+    let tx = dEthContract.ExecuteFunction "automate" [|180;220;200;one;one;one|]
     tx |> shouldSucceed
 
 [<Specification("dEth", "redeem", 0)>]
 [<Fact>]
 let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` () =
     let dEthContract = getDEthContractEthConn ()
-    let tokensAmount = bigint 100
+    let tokensAmount = bigint 100 //anti-pattern fix please. 
 
     let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
     dEthContract.ExecuteFunction "transfer" [|redeemerConnection.Account.Address;tokensAmount|] |> shouldSucceed

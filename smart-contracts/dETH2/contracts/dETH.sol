@@ -225,14 +225,14 @@ contract dEth is
         guard.permit(
             _FoundryTreasury,
             address(this),
-            bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)")));
+            bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)")));
         setAuthority(guard);
 
         require(
             authority.canCall(
                 _FoundryTreasury, 
                 address(this), 
-                bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256)"))),
+                bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)"))),
             "guard setting failed");
     }
 
@@ -436,7 +436,7 @@ contract dEth is
         // to prevent bites, getRatio() doesn't use oracle but the price set in the MakerCDP system 
         require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
 
-        emit Redeemed(
+        emit Redeemed(  
             msg.sender,
             _receiver, 
             _tokensToRedeem,
