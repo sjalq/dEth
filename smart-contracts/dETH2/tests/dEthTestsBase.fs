@@ -13,6 +13,9 @@ type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFuncti
 module Array = 
     let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
 
+let protocolFeePercent = bigint 9 * BigInteger.Pow(bigint 10, 15)
+let hundredPerc = BigInteger.Pow(bigint 10, 18)
+
 let RAY = BigInteger.Pow(bigint 10, 27);
 let rdiv x y = (x * RAY + y / bigint 2) / y;
 
@@ -148,8 +151,6 @@ let pokePIP pipAddress =
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
-    let protocolFeePercent = bigint 9 * BigInteger.Pow(bigint 10, 15)
-    let hundredPerc = BigInteger.Pow(bigint 10, 18) 
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
     let collateralAffected = excessCollateral * redeemTokenSupplyPerc / hundredPerc
     let protocolFee = collateralAffected * protocolFeePercent / hundredPerc
@@ -158,3 +159,12 @@ let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automat
     let collateralReturned = collateralAffected - protocolFee - automationFee;
 
     (protocolFee, automationFee, collateralRedeemed, collateralReturned)
+
+let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollateral totalSupply =
+    let protocolFee = suppliedCollateral * protocolFeePercent / hundredPerc
+    let automationFee = suppliedCollateral * automationFeePerc / hundredPerc
+    let actualCollateralAdded = suppliedCollateral - protocolFee; // _protocolFee goes to the protocol 
+    let accreditedCollateral = actualCollateralAdded - automationFee; // _automationFee goes to the pool of funds in the cdp to offset gas implications
+    let newTokenSupplyPerc = accreditedCollateral * hundredPerc / excessCollateral
+    let tokensIssued = totalSupply * newTokenSupplyPerc / hundredPerc
+    (protocolFee, automationFee, actualCollateralAdded, accreditedCollateral, tokensIssued)
