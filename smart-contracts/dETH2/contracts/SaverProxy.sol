@@ -1322,7 +1322,14 @@ contract SubscriptionsV2 is AdminAuth, StaticV2, ConstantAddresses {
     
     
     
-    function subscribe(uint _cdpId, uint128 _minRatio, uint128 _maxRatio, uint128 _optimalBoost, uint128 _optimalRepay, bool _boostEnabled, bool _nextPriceEnabled) external {
+    function subscribe(
+            uint _cdpId, 
+            uint128 _minRatio, 
+            uint128 _maxRatio, 
+            uint128 _optimalBoost, 
+            uint128 _optimalRepay, 
+            bool _boostEnabled, 
+            bool _nextPriceEnabled) external {
         require(isOwner(msg.sender, _cdpId), "Must be called by Cdp owner");
 
         
