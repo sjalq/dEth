@@ -497,6 +497,7 @@ contract dEth is
             true,
             subscriptions);
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
+        
         emit AutomationSettingsChanged(
             _repaymentRatio,
             _targetRatio,
