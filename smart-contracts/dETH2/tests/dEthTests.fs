@@ -1,24 +1,26 @@
 module dEthTests
 
-open TestBase
+open System
+open System.Numerics
 open Xunit
 open FsUnit.Xunit
-open Nethereum.Web3
-open System.Numerics
+open FsUnit.CustomMatchers
+open Constants
+open TestBase
 open dEthTestsBase
+open Nethereum.Web3
+open Nethereum.Util
 open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Web3.Accounts
 open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
+open Nethereum.Contracts
 open DETH2.Contracts.DEth.ContractDefinition
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition;
-open Nethereum.Contracts
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
 open DETH2.Contracts.IFlipper.ContractDefinition
 open DETH2.Contracts.ManagerLike.ContractDefinition
-open Nethereum.Util
-open System
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
 type VatIlksOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.IlksOutputDTO
@@ -397,3 +399,39 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     // check that we can squander and that we have received ERC20 tokens
     dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|address|] ethConn |> runNow |> shouldSucceed
     should greaterThan (bigint 0) <| dEthContract.Query<bigint> "balanceOf" [|address|]
+
+[<Specification("dEth", "automate", 0)>]
+[<Fact>]
+let ``dEth - automate - check that an authorised address can change the automation settings`` () =   
+    let dEthContract = getDEthContractEthConn ()
+
+    let tx = dEthContract.ExecuteFunction "automate" [|one;one;one;one;one;one|]
+
+    tx |> shouldSucceed
+
+[<Specification("dEth", "redeem", 0)>]
+[<Fact>]
+let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` () = 
+    let dEthContract = getDEthContractEthConn ()
+    let tokensAmount = bigint 100
+
+    let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
+    dEthContract.ExecuteFunction "transfer" [|redeemerConnection.Account.Address;tokensAmount|] |> shouldSucceed
+
+    let dEthQuery name = dEthContract.Query<bigint> name [||]
+    let (protocolFee, automationFee, collateralRedeemed, collateralReturned) = calculateRedemptionValue tokensAmount (dEthQuery "totalSupply") (dEthQuery "getExcessCollateral") (dEthQuery "automationFeePerc")
+//    let outputDTO =  
+
+    let receiverAddress = makeAccount().Address
+    let tx = dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|] <| EthereumConnection(hardhatURI, hardhatPrivKey2)
+
+    tx |> shouldSucceed
+    receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturned
+
+    let event = tx.DecodeAllEvents<RedeemedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
+    
+    event.AutomationFee |> should equal automationFee
+    event.CollateralRedeemed |> should equal collateralRedeemed
+    event.CollateralReturned |> should equal collateralReturned
+    event.ProtocolFee |> should equal protocolFee
+    event.Receiver |> should equal redeemerConnection.Account.Address

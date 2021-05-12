@@ -256,7 +256,12 @@ let padAddress (address:string) =
     
     (Array.replicate (bytesToPad * 2) '0' |> String) + addressWithout0x
 
-let startOfSale = debug.BlockTimestamp + BigInteger (1UL * hours)
-let bucketPeriod = 7UL * hours |> BigInteger
-let bucketSupply = 50000UL |> BigInteger
-let bucketCount = 1250UL |> BigInteger
+let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
+    let txInput = functionArgs.CreateTransactionInput(addressTo)
+    
+    txInput.From <- addressfrom
+    txInput.Gas <- hexBigInt 9500000UL
+    txInput.GasPrice <- hexBigInt 0UL
+    txInput.Value <- hexBigInt 0UL
+
+    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow

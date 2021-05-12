@@ -4,10 +4,11 @@ open TestBase
 open Nethereum.Util
 open System.Numerics
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
-open Nethereum.Contracts
-open Nethereum.Web3
 open DETH2.Contracts.VatLike.ContractDefinition
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
+open Nethereum.JsonRpc.Client
+
+type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFunction
 
 module Array = 
     let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
@@ -95,6 +96,12 @@ let getDEthContract () =
     let _, contract = getDEthContractAndAuthority ()
     contract
 
+let getDEthContractEthConn () =
+    let _, contract = getDEthContractFromOracle oracleContractMainnet true
+    do ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
+    do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> ignore
+    contract    
+
 let getMockDSValueFormat (priceFormatted:BigInteger) =
     let mockDSValue = makeContract [||] "DSValueMock"
     mockDSValue.ExecuteFunction "setData" [|priceFormatted |] |> ignore
@@ -111,16 +118,6 @@ let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProx
     let excessCollateral = cdpDetailedInfoOutput.Collateral - collateralDenominatedDebt
 
     (priceEthDai, priceRay, saverProxy, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral)
-
-let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
-    let txInput = functionArgs.CreateTransactionInput(addressTo)
-    
-    txInput.From <- addressfrom
-    txInput.Gas <- hexBigInt 9500000UL
-    txInput.GasPrice <- hexBigInt 0UL
-    txInput.Value <- hexBigInt 0UL
-
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
 
 let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
         let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
@@ -149,3 +146,15 @@ let findActiveCDP ilkArg =
 let pokePIP pipAddress = 
     do ethConn.TimeTravel <| Constants.hours * 2UL
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
+
+let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
+    let protocolFeePercent = BigInteger.Pow(bigint 9 * bigint 10, 15)
+    let hundredPerc = BigInteger.Pow(bigint 10, 18) 
+    let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
+    let collateralAffected = excessCollateral * redeemTokenSupplyPerc / hundredPerc
+    let protocolFee = collateralAffected * protocolFeePercent / hundredPerc
+    let automationFee = collateralAffected * automationFeePerc / hundredPerc;
+    let collateralRedeemed = collateralAffected - automationFee; // how much capital should exit the dEth contract
+    let collateralReturned = collateralAffected - protocolFee - automationFee;
+
+    (protocolFee, automationFee, collateralRedeemed, collateralReturned)
