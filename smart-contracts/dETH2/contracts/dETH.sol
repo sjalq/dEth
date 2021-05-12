@@ -364,7 +364,7 @@ contract dEth is
         (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
         require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
 
-        // note: the automationFee is left in the CDFP to cover the gas implications of leaving or joining dEth
+        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
 
         _mint(_receiver, tokensToIssue);
         
@@ -487,8 +487,6 @@ contract dEth is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
 
-        console.log("automating");
-
         minRedemptionRatio = _minRedemptionRatio;
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
@@ -503,13 +501,7 @@ contract dEth is
             true,
             true,
             subscriptions);
-        
-        console.log("subscribeProxyCall done");
-
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
-        
-        console.log("subscribeProxyCall called");
-
         emit AutomationSettingsChanged(
             _repaymentRatio,
             _targetRatio,
