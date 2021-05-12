@@ -148,7 +148,7 @@ let pokePIP pipAddress =
     do callFunctionWithoutSigning ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
-    let protocolFeePercent = BigInteger.Pow(bigint 9 * bigint 10, 15)
+    let protocolFeePercent = bigint 9 * BigInteger.Pow(bigint 10, 15)
     let hundredPerc = BigInteger.Pow(bigint 10, 18) 
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
     let collateralAffected = excessCollateral * redeemTokenSupplyPerc / hundredPerc

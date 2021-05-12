@@ -420,7 +420,6 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 
     let dEthQuery name = dEthContract.Query<bigint> name [||]
     let (protocolFee, automationFee, collateralRedeemed, collateralReturned) = calculateRedemptionValue tokensAmount (dEthQuery "totalSupply") (dEthQuery "getExcessCollateral") (dEthQuery "automationFeePerc")
-//    let outputDTO =  
 
     let receiverAddress = makeAccount().Address
     let tx = dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|] <| EthereumConnection(hardhatURI, hardhatPrivKey2)
@@ -434,4 +433,4 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
     event.CollateralRedeemed |> should equal collateralRedeemed
     event.CollateralReturned |> should equal collateralReturned
     event.ProtocolFee |> should equal protocolFee
-    event.Receiver |> should equal redeemerConnection.Account.Address
+    event.Receiver |> shouldEqualIgnoringCase receiverAddress
