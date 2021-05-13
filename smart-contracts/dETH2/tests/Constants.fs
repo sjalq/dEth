@@ -10,3 +10,8 @@ let hours = 60UL * minutes
 let days = 24UL * hours
 
 let one = BigInteger.One
+
+[<Literal>]
+let ownerArg = "owner"
+[<Literal>]
+let contractArg = "contract"

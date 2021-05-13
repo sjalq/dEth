@@ -33,8 +33,9 @@ let ethGemJoin = "0x2F0b23f53734252Bda2277357e97e1517d6B042A"
 let saverProxy = "0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47"
 let saverProxyActions = "0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038"
 let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
-let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
+[<Literal>]
 let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
+let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
 let cdpOwner = "0xBA1a28b8c69Bdb92d0c898A0938cd2814dc2cA5A"
 let cat = "0xa5679c04fc3d9d8b0aab1f0ab83555b301ca70ea" // the contract that bites
 let vat = "0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
@@ -168,3 +169,12 @@ let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollatera
     let newTokenSupplyPerc = accreditedCollateral * hundredPerc / excessCollateral
     let tokensIssued = totalSupply * newTokenSupplyPerc / hundredPerc
     (protocolFee, automationFee, actualCollateralAdded, accreditedCollateral, tokensIssued)
+
+let impersonateAccount (address:string) =
+    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
+
+let getAddressFromArg arg contractAddress = 
+    match arg with 
+      | "owner" -> ethConn.Account.Address
+      | "contract" -> contractAddress
+      | _ -> arg

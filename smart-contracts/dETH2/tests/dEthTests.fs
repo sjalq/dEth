@@ -15,7 +15,7 @@ open Nethereum.Web3.Accounts
 open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
 open Nethereum.Contracts
-open DETH2.Contracts.DEth.ContractDefinition
+open DETH2.Contracts.dEth.ContractDefinition
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition;
 open DETH2.Contracts.VatLike.ContractDefinition
 open DETH2.Contracts.PipLike.ContractDefinition
@@ -401,16 +401,42 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     should greaterThan (bigint 0) <| dEthContract.Query<bigint> "balanceOf" [|address|]
 
 [<Specification("dEth", "automate", 0)>]
-[<Fact>]
-let ``dEth - automate - check that an authorised address can change the automation settings`` () =   
+[<Theory>]
+[<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
+[<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
+[<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
+let ``dEth - automate - check that an authorised address can change the automation settings`` address repaymentRatioExpected targetRatioExpected boostRatioExpected minRedemptionRatioExpected automationFeePercExpected riskLimitExpected =
     let dEthContract = getDEthContractEthConn ()
 
-    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager) 
+    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
     let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
     cdpOwner |> shouldEqualIgnoringCase dEthContract.Address
 
-    let tx = dEthContract.ExecuteFunction "automate" [|180;220;200;one;one;one|]
+    let address = getAddressFromArg address dEthContract.Address
+
+    impersonateAccount address
+
+    let tx = AutomateFunction(RepaymentRatio = repaymentRatioExpected, TargetRatio = targetRatioExpected, BoostRatio = boostRatioExpected, MinRedemptionRatio = minRedemptionRatioExpected, AutomationFeePerc = automationFeePercExpected, RiskLimit = riskLimitExpected)
+                |> callFunctionWithoutSigning address dEthContract.Address 
+                |> ethConn.Web3.TransactionManager.TransactionReceiptService.PollForReceiptAsync
+                |> runNow
+
     tx |> shouldSucceed
+
+    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal minRedemptionRatioExpected
+    dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal automationFeePercExpected
+    dEthContract.Query<bigint> "riskLimit" [||] |> should equal riskLimitExpected
+
+    let event = tx.DecodeAllEvents<AutomationSettingsChangedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
+
+    event.AutomationFeePerc |> should equal automationFeePercExpected
+    event.BoostRatio |> should equal boostRatioExpected
+    event.MinRedemptionRatio |> should equal minRedemptionRatioExpected
+    event.RepaymentRatio |> should equal repaymentRatioExpected
+    event.TargetRatio |> should equal targetRatioExpected
+    event.RiskLimit |> should equal riskLimitExpected
+
+
 
 [<Specification("dEth", "redeem", 0)>]
 [<Fact>]
