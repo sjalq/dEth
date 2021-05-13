@@ -161,6 +161,10 @@ let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automat
 
     (protocolFee, automationFee, collateralRedeemed, collateralReturned)
 
+let getRedemptionValue (dEthContract:ContractPlug) tokensAmount =
+    let dEthQuery name = dEthContract.Query<bigint> name [||]
+    calculateRedemptionValue tokensAmount (dEthQuery "totalSupply") (dEthQuery "getExcessCollateral") (dEthQuery "automationFeePerc")
+
 let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollateral totalSupply =
     let protocolFee = suppliedCollateral * protocolFeePercent / hundredPerc
     let automationFee = suppliedCollateral * automationFeePerc / hundredPerc

@@ -460,29 +460,38 @@ let ``dEth - automate - check that an unauthorised address cannot change the aut
     |> shouldRevertWithUnknownMessage
 
 [<Specification("dEth", "redeem", 0)>]
-[<Fact>]
-let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` () =
+[<Theory>]
+[<InlineData(100)>]
+[<InlineData(1000000)>]
+[<InlineData(1000000000UL)>]
+let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensAmount:int64) =
     let dEthContract = getDEthContractEthConn ()
-    let tokensAmount = bigint 100 //anti-pattern fix please. 
+    let tokensAmount = bigint tokensAmount
 
-    let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
+    let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)    
     dEthContract.ExecuteFunction "transfer" [|redeemerConnection.Account.Address;tokensAmount|] |> shouldSucceed
 
-    let dEthQuery name = dEthContract.Query<bigint> name [||]
-    let (protocolFee, automationFee, collateralRedeemed, collateralReturned) = calculateRedemptionValue tokensAmount (dEthQuery "totalSupply") (dEthQuery "getExcessCollateral") (dEthQuery "automationFeePerc")
+    let getTokenBalance () = dEthContract.Query<bigint> "balanceOf" [|redeemerConnection.Account.Address|]
+    getTokenBalance () |> should equal tokensAmount
+
+    let getGulperBalance () = gulper |> ethConn.GetEtherBalance
+    let gulperBalanceBeforeRedeem = getGulperBalance ()
 
     let receiverAddress = makeAccount().Address
-    let tx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|]
+    let redeemTx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|]
+    redeemTx |> shouldSucceed
 
-    tx |> shouldSucceed
-    receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturned
+    let (protocolFeeExpected, automationFeeExpected, collateralRedeemedExpected, collateralReturnedExpected) = getRedemptionValue dEthContract tokensAmount
 
-    let event = tx.DecodeAllEvents<RedeemedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
-    
-    event.AutomationFee |> should equal automationFee
-    event.CollateralRedeemed |> should equal collateralRedeemed
-    event.CollateralReturned |> should equal collateralReturned
-    event.ProtocolFee |> should equal protocolFee
+    receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturnedExpected
+    getGulperBalance () |> should equal <| protocolFeeExpected + gulperBalanceBeforeRedeem
+    getTokenBalance () |> should equal <| BigInteger.Zero
+
+    let event = redeemTx.DecodeAllEvents<RedeemedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
+    event.AutomationFee |> should equal automationFeeExpected
+    event.CollateralRedeemed |> should equal collateralRedeemedExpected
+    event.CollateralReturned |> should equal collateralReturnedExpected
+    event.ProtocolFee |> should equal protocolFeeExpected
     event.Receiver |> shouldEqualIgnoringCase receiverAddress
 
 [<Specification("dEth", "redeem", 1)>]
