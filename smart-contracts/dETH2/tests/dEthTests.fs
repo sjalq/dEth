@@ -499,7 +499,6 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 [<InlineData(10000)>]
 let ``dEth - redeem - check that someone without a balance can never redeem Ether`` tokensAmount =
     let dEthContract = getDEthContractEthConn ()
-
     let account = makeAccount()
 
     ethConn.GasPrice.Value * ethConn.Gas.Value * bigint 2
@@ -515,6 +514,7 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 [<Specification("dEth", "squanderMyEthForWorthlessBeans", 1)>]
 [<Theory>]
 [<InlineData(1000, 9)>]
+[<InlineData(0, 0)>] // https://trello.com/c/dUiUeVza/22-deth-squandermyethforworthlessbeans-check-that-no-one-providing-no-ether-can-issue-themselves-any-deth
 let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (weiValue:int) (allowedInkDeviation:int) =
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
