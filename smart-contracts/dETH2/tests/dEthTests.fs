@@ -461,14 +461,16 @@ let ``dEth - automate - check that an unauthorised address cannot change the aut
 
 [<Specification("dEth", "redeem", 0)>]
 [<Theory>]
-[<InlineData(100)>]
-[<InlineData(1000000)>]
-[<InlineData(1000000000UL)>]
-let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensAmount:int64) =
+[<InlineData(100, 1)>]
+[<InlineData(1000000, 1)>]
+[<InlineData(1000000000UL, 1)>]
+[<InlineData(100, 10)>]
+[<InlineData(1000000, 40)>]
+let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensAmount:int64) (riskLevelExceedCollateralRatio:int) =
     let dEthContract = getDEthContractEthConn ()
     let tokensAmount = bigint tokensAmount
 
-    let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)    
+    let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
     dEthContract.ExecuteFunction "transfer" [|redeemerConnection.Account.Address;tokensAmount|] |> shouldSucceed
 
     let getTokenBalance () = dEthContract.Query<bigint> "balanceOf" [|redeemerConnection.Account.Address|]
@@ -476,6 +478,12 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 
     let getGulperBalance () = gulper |> ethConn.GetEtherBalance
     let gulperBalanceBeforeRedeem = getGulperBalance ()
+
+    let excessCollateral = dEthContract.Query<bigint> "getExcessCollateral" [||]
+    
+    excessCollateral - excessCollateral / bigint riskLevelExceedCollateralRatio
+    |> changeRiskLevel dEthContract
+    |> shouldSucceed
 
     let receiverAddress = makeAccount().Address
     let redeemTx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|]
