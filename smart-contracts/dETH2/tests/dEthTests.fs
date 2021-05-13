@@ -512,36 +512,37 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
     |> Seq.head
     |> shouldRevertWithMessage "ERC20: burn amount exceeds balance"
 
-[<Specification("dEth", "redeem", 1)>]
-[<Fact>]
-let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` () =
+[<Specification("dEth", "squanderMyEthForWorthlessBeans", 1)>]
+[<Theory>]
+[<InlineData(1000, 9)>]
+let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (weiValue:int) (allowedInkDeviation:int) =
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+    
     let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
         
+    let getGulperBalance () = gulper |> ethConn.GetEtherBalance
+    let gulperBalanceBeforeRedeem = getGulperBalance ()
     let inkBefore = (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink
 
     let dEthContract = getDEthContractEthConn ()
-    let weiValue = bigint 1000
+    let weiValue = bigint weiValue
     let recipient = makeAccount().Address
     let tx = dEthContract.ExecuteFunctionFromAsyncWithValue weiValue "squanderMyEthForWorthlessBeans" [|recipient|] ethConn |> runNow
 
     tx |> shouldSucceed
 
-    let (protocolFee, automationFee, actualCollateralAdded, accreditedCollateral, tokensIssued) = 
-        let dEthQuery name = dEthContract.Query<bigint> name [||]
-        calculateIssuanceAmount weiValue (dEthQuery "automationFeePerc") (dEthQuery "getExcessCollateral") (dEthQuery "totalSupply")
-
-    let inkAfter = (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink
-
-    dEthContract.Query<bigint> "balanceOf" [|recipient|] |> should equal tokensIssued
-    //inkAfter |> should equal (inkBefore + weiValue)
+    let (protocolFeeExpected, automationFeeExpected, actualCollateralAddedExpected, accreditedCollateralExpected, tokensIssuedExpected) = getIssuanceAmount dEthContract weiValue
+   
+    dEthContract.Query<bigint> "balanceOf" [|recipient|] |> should equal tokensIssuedExpected
+    (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink |> should (equalWithin <| bigint allowedInkDeviation) <| inkBefore + weiValue
+    getGulperBalance () |> should equal <| gulperBalanceBeforeRedeem + protocolFeeExpected
 
     let event = tx.DecodeAllEvents<IssuedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
-    event.AutomationFee |> should equal automationFee
-    event.ProtocolFee |> should equal protocolFee
+    event.AutomationFee |> should equal automationFeeExpected
+    event.ProtocolFee |> should equal protocolFeeExpected
     event.SuppliedCollateral |> should equal weiValue
     event.Receiver |> shouldEqualIgnoringCase recipient
-    event.TokensIssued |> should equal tokensIssued
-    event.AccreditedCollateral |> should equal accreditedCollateral
-    event.ActualCollateralAdded |> should equal actualCollateralAdded
+    event.TokensIssued |> should equal tokensIssuedExpected
+    event.AccreditedCollateral |> should equal accreditedCollateralExpected
+    event.ActualCollateralAdded |> should equal actualCollateralAddedExpected

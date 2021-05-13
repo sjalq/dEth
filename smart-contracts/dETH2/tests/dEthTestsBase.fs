@@ -174,6 +174,10 @@ let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollatera
     let tokensIssued = totalSupply * newTokenSupplyPerc / hundredPerc
     (protocolFee, automationFee, actualCollateralAdded, accreditedCollateral, tokensIssued)
 
+let getIssuanceAmount (dEthContract:ContractPlug) weiValue = 
+    let dEthQuery name = dEthContract.Query<bigint> name [||]
+    calculateIssuanceAmount weiValue (dEthQuery "automationFeePerc") (dEthQuery "getExcessCollateral") (dEthQuery "totalSupply")
+
 let impersonateAccount (address:string) =
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
 
