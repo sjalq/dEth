@@ -526,10 +526,13 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
     let inkBefore = (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink
 
     let dEthContract = getDEthContractEthConn ()
+
+    dEthContract.Query<bigint> "getExcessCollateral" [||]
+    |> should lessThan (dEthContract.Query<bigint> "riskLimit" [||])
+
     let weiValue = bigint weiValue
     let recipient = makeAccount().Address
     let tx = dEthContract.ExecuteFunctionFromAsyncWithValue weiValue "squanderMyEthForWorthlessBeans" [|recipient|] ethConn |> runNow
-
     tx |> shouldSucceed
 
     let (protocolFeeExpected, automationFeeExpected, actualCollateralAddedExpected, accreditedCollateralExpected, tokensIssuedExpected) = getIssuanceAmount dEthContract weiValue
