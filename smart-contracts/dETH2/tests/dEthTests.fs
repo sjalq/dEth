@@ -58,8 +58,8 @@ let ``price is correct given source prices within ten percents of one another`` 
     let price = oracleContract.Query<bigint> "getEthDaiPrice" [||]
 
     let expected =
-        if differencePercent <= 0.1M 
-            then toMakerPriceFormatDecimal priceNonMakerDaiEth 
+        if differencePercent <= 0.1M
+            then toMakerPriceFormatDecimal priceNonMakerDaiEth
             else toMakerPriceFormatDecimal priceMaker
 
     should equal expected price
@@ -405,7 +405,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 [<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
-let ``dEth - automate - check that an authorised address can change the automation settings`` address repaymentRatioExpected targetRatioExpected boostRatioExpected minRedemptionRatioExpected automationFeePercExpected riskLimitExpected =
+let ``dEth - automate - check that an authorised address can change the automation settings`` (address:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
     let dEthContract = getDEthContractEthConn ()
 
     let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
@@ -413,30 +413,51 @@ let ``dEth - automate - check that an authorised address can change the automati
     cdpOwner |> shouldEqualIgnoringCase dEthContract.Address
 
     let address = getAddressFromArg address dEthContract.Address
-
     impersonateAccount address
 
-    let tx = AutomateFunction(RepaymentRatio = repaymentRatioExpected, TargetRatio = targetRatioExpected, BoostRatio = boostRatioExpected, MinRedemptionRatio = minRedemptionRatioExpected, AutomationFeePerc = automationFeePercExpected, RiskLimit = riskLimitExpected)
+    let tx = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected, 
+                                BoostRatio = bigint boostRatioExpected, MinRedemptionRatio = bigint minRedemptionRatioExpected,
+                                AutomationFeePerc = bigint automationFeePercExpected, RiskLimit = bigint riskLimitExpected)
                 |> callFunctionWithoutSigning address dEthContract.Address 
                 |> ethConn.Web3.TransactionManager.TransactionReceiptService.PollForReceiptAsync
                 |> runNow
 
     tx |> shouldSucceed
 
-    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal minRedemptionRatioExpected
-    dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal automationFeePercExpected
-    dEthContract.Query<bigint> "riskLimit" [||] |> should equal riskLimitExpected
+    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal <| bigint minRedemptionRatioExpected
+    dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal <| bigint automationFeePercExpected
+    dEthContract.Query<bigint> "riskLimit" [||] |> should equal <| bigint riskLimitExpected
 
     let event = tx.DecodeAllEvents<AutomationSettingsChangedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
 
-    event.AutomationFeePerc |> should equal automationFeePercExpected
-    event.BoostRatio |> should equal boostRatioExpected
-    event.MinRedemptionRatio |> should equal minRedemptionRatioExpected
-    event.RepaymentRatio |> should equal repaymentRatioExpected
-    event.TargetRatio |> should equal targetRatioExpected
-    event.RiskLimit |> should equal riskLimitExpected
+    event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
+    event.BoostRatio |> should equal <| bigint boostRatioExpected
+    event.MinRedemptionRatio |> should equal <| bigint minRedemptionRatioExpected
+    event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
+    event.TargetRatio |> should equal <| bigint targetRatioExpected
+    event.RiskLimit |> should equal <| bigint riskLimitExpected
 
+[<Specification("dEth", "automate", 1)>]
+[<Theory>]
+[<InlineData(180, 220, 220, 1, 1, 1)>]
+let ``dEth - automate - check that an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
+    let dEthContract = getDEthContractEthConn ()
 
+    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+    let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
+    cdpOwner |> shouldEqualIgnoringCase dEthContract.Address
+
+    let account = makeAccount()
+
+    ethConn.GasPrice.Value * ethConn.Gas.Value * bigint 2
+    |> ethConn.SendEther account.Address
+    |> shouldSucceed
+   
+    Debug <| EthereumConnection(hardhatURI, account.PrivateKey)
+    |> dEthContract.ExecuteFunctionFrom "automate" [|repaymentRatioExpected;targetRatioExpected;boostRatioExpected;minRedemptionRatioExpected;automationFeePercExpected;riskLimitExpected|]
+    |> debug.DecodeForwardedEvents
+    |> Seq.head
+    |> shouldRevertWithUnknownMessage
 
 [<Specification("dEth", "redeem", 0)>]
 [<Fact>]

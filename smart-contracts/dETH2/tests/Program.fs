@@ -2,5 +2,5 @@
 
 [<EntryPoint>]
 let main _ =
-    let s = dEthTests.``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` ()
+    let s = dEthTests.``dEth - automate - check that an unauthorised address cannot change the automation settings`` 180 220 220 1 1 1
     0
