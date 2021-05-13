@@ -239,9 +239,18 @@ let padAddress (address:string) =
     
     (Array.replicate (bytesToPad * 2) '0' |> String) + addressWithout0x
 
+// TODO :
+// 1. rename
+// 2. consider moving impersonation step inside here (be careful)
+// 3. refactor into EthConn if appropriate
+// 4. Consider splitting into normal and Async
+// 5. Consider further specializing to retrieve receipt async and receipt sync
 let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
     let txInput = functionArgs.CreateTransactionInput(addressTo)
     
+    // TODO
+    // this is going to cause you trouble later on
+    // consider later refactor
     txInput.From <- addressfrom
     txInput.Gas <- hexBigInt 9500000UL
     txInput.GasPrice <- hexBigInt 0UL

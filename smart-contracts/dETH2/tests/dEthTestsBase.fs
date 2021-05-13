@@ -192,6 +192,14 @@ let changeRiskLevel (dEthContract:ContractPlug) riskLimit =
 let impersonateAccount (address:string) =
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
 
+// TODO : 
+// 1. give better name
+// 2. pattern match to string is antipattern
+type AddressArg =
+    | Owner
+    | Contract
+    | Address of string
+
 let getAddressFromArg arg contractAddress = 
     match arg with 
       | "owner" -> ethConn.Account.Address
