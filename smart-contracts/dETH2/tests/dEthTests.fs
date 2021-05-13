@@ -495,13 +495,19 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
     event.Receiver |> shouldEqualIgnoringCase receiverAddress
 
 [<Specification("dEth", "redeem", 1)>]
-[<Fact>]
-let ``dEth - redeem - check that someone without a balance can never redeem Ether`` () =
-    let dEthContract = getDEthContractEthConn ()    
-    let debug = EthereumConnection(hardhatURI, hardhatPrivKey2) |> Debug
+[<Theory>]
+[<InlineData(10000)>]
+let ``dEth - redeem - check that someone without a balance can never redeem Ether`` tokensAmount =
+    let dEthContract = getDEthContractEthConn ()
 
-    debug
-    |> dEthContract.ExecuteFunctionFrom "redeem" [|makeAccount().Address;10000|]
+    let account = makeAccount()
+
+    ethConn.GasPrice.Value * ethConn.Gas.Value * bigint 2
+    |> ethConn.SendEther account.Address
+    |> shouldSucceed
+
+    Debug <| EthereumConnection(hardhatURI, account.PrivateKey)
+    |> dEthContract.ExecuteFunctionFrom "redeem" [|makeAccount().Address;tokensAmount|]
     |> debug.DecodeForwardedEvents
     |> Seq.head
     |> shouldRevertWithMessage "ERC20: burn amount exceeds balance"
