@@ -439,7 +439,7 @@ let ``dEth - automate - check that an authorised address can change the automati
 
 [<Specification("dEth", "automate", 1)>]
 [<Theory>]
-[<InlineData(180, 220, 220, 1, 1, 1)>]
+[<InlineData(repaymentRatio, targetRatio, boostRatio, 1, 1, 1)>]
 let ``dEth - automate - check that an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
     let dEthContract = getDEthContractEthConn ()
 
@@ -546,3 +546,18 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
     event.TokensIssued |> should equal tokensIssuedExpected
     event.AccreditedCollateral |> should equal accreditedCollateralExpected
     event.ActualCollateralAdded |> should equal actualCollateralAddedExpected
+
+[<Specification("dEth", "squanderMyEthForWorthlessBeans", 2)>]
+[<Fact>]
+let ``dEth - squanderMyEthForWorthlessBeans - check that the riskLevel cannot be exceeded`` () =
+    let dEthContract = getDEthContractEthConn ()
+    let excessCollateral = dEthContract.Query<bigint> "getExcessCollateral" [||]
+    let exceededRiskLevel = excessCollateral - excessCollateral / bigint 10
+
+    changeRiskLevel dEthContract exceededRiskLevel |> shouldSucceed
+
+    debug
+    |> dEthContract.ExecuteFunctionFrom "squanderMyEthForWorthlessBeans" [|makeAccount().Address|]
+    |> debug.DecodeForwardedEvents
+    |> Seq.head
+    |> shouldRevertWithMessage "risk limit exceeded"

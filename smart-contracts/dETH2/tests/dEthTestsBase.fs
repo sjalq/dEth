@@ -46,6 +46,13 @@ let ilkFlipper = "0xF32836B9E1f47a0515c6Ec431592D5EbC276407f"
 let ilkFlipperAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 let daiMainnet = "0x6b175474e89094c44da98b954eedeac495271d0f"
 
+[<Literal>]
+let repaymentRatio = 180
+[<Literal>]
+let targetRatio = 220
+[<Literal>]
+let boostRatio = 220
+
 let makeOracle makerOracle daiUsd ethUsd = makeContract [| makerOracle;daiUsd;ethUsd |] "Oracle"
 
 let makerOracle = makeContract [||] "MakerOracleMock"
@@ -177,6 +184,10 @@ let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollatera
 let getIssuanceAmount (dEthContract:ContractPlug) weiValue = 
     let dEthQuery name = dEthContract.Query<bigint> name [||]
     calculateIssuanceAmount weiValue (dEthQuery "automationFeePerc") (dEthQuery "getExcessCollateral") (dEthQuery "totalSupply")
+
+let changeRiskLevel (dEthContract:ContractPlug) riskLimit =
+    let dEthQuery name = dEthContract.Query<bigint> name [||]
+    dEthContract.ExecuteFunction "automate" [| repaymentRatio;targetRatio;boostRatio; dEthQuery "minRedemptionRatio"; dEthQuery "automationFeePerc"; riskLimit |]
 
 let impersonateAccount (address:string) =
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
