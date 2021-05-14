@@ -7,6 +7,7 @@ open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 open DETH2.Contracts.VatLike.ContractDefinition
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
 open Nethereum.RPC.Eth.DTOs
+open Nethereum.JsonRpc.Client
 
 type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFunction
 type VatUrnsOutputDTO = UrnsOutputDTO
@@ -219,8 +220,7 @@ let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =
       | "contract" -> calledContractAddress
       | _ -> inlineDataArgument
 
-let dEthInitializationsBlockNumber = (ethConn.Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync () |> runNow).Value
-printfn "%A" dEthInitializationsBlockNumber
-let dEthInitializationsNonce = ethConn.Web3.Eth.Transactions.GetTransactionCount.SendRequestAsync(ethConn.Account.Address, BlockParameter.CreatePending());
+// todo: get snapshotId
+let snapshotID = ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "evm_snapshot", [||])) |> runNowWithoutResult
 
-let resetState () = ethConn.ResetAccount dEthInitializationsBlockNumber dEthInitializationsNonce
+let resetState () = ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "evm_revert", [|snapshotID|])) |> runNowWithoutResult

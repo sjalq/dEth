@@ -72,7 +72,7 @@ type EthereumConnection(nodeURI: string, privKey: string) =
                     data, 
                     toAddress, 
                     this.Account.Address, 
-                    this.Gas, 
+                    this.Gas,
                     this.GasPrice, 
                     HexBigInteger(value))
             this.Web3.Eth.TransactionManager.SendTransactionAndWaitForReceiptAsync(input, null)
