@@ -11,6 +11,8 @@ let days = 24UL * hours
 
 let one = BigInteger.One
 
+let E18 = BigInteger.Pow(bigint 10, 18)
+
 [<Literal>]
 let ownerArg = "owner"
 [<Literal>]

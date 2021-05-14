@@ -1,24 +1,29 @@
 module TestBase
 
-open Nethereum.Web3
-open FsUnit.Xunit
-open Microsoft.FSharp.Control
-open FSharp.Data
 open System
-open Nethereum.RPC.Eth.DTOs
 open System.Numerics
-open Nethereum.Hex.HexTypes
 open System.IO
-open Newtonsoft.Json
-open Newtonsoft.Json.Linq
+open System.Text
+open System.Threading.Tasks
+open Nethereum.Web3
+open Nethereum.Web3.Accounts
+open Nethereum.Util
 open Nethereum.Contracts
 open Nethereum.Hex.HexConvertors.Extensions
-open System.Text
-open Constants
+open Nethereum.RPC.Eth.DTOs
+open Nethereum.Hex.HexTypes
+open Nethereum.JsonRpc.Client
+open FsUnit.Xunit
+open Microsoft.FSharp.Control
+open Newtonsoft.Json
+open Newtonsoft.Json.Linq
 open Foundry.Contracts.Debug.ContractDefinition
-open System.Threading.Tasks
-open Nethereum.Web3.Accounts
-open System.Threading
+open Constants
+
+module Array =
+    let ensureSize size array =
+        let paddingArray = Array.init size (fun _ -> byte 0)
+        Array.concat [|array;paddingArray|] |> Array.take size
 
 let rnd = Random()
 
@@ -52,6 +57,7 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member val public GasPrice = hexBigInt 8000000000UL
     member val public Account = Accounts.Account(privKey)
     member val public Web3 = Web3(Accounts.Account(privKey), nodeURI)
+    member val public Web3Unsigned = (Web3(nodeURI))
 
     interface IAsyncTxSender with
         member this.SendTxAsync toAddress value data = 
@@ -96,6 +102,39 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member this.SendEther address amount =
         this.SendEtherAsync address amount |> runNow
 
+    member this.ResetAccount () =
+        this.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [||])) |> runNowWithoutResult
+        
+        match this.Account.NonceService with 
+        | null -> () // nonceService is lazily inited, so if it's null, it means there were no txs and nonce is already 0
+        | a -> a.ResetNonce () |> runNowWithoutResult
+
+    member this.ImpersonateAccount (address:string) =
+        this.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
+
+    // ResolvedTODO:
+    // 1. rename +
+    // 2. consider moving impersonation step inside here (be careful) +
+    // 3. refactor into EthConn if appropriate +
+    // 4. Consider splitting into normal and Async +
+    // 5. Consider further specializing to retrieve receipt async and receipt sync +
+    member this.MakeImpersonatedCallAsync weiValue gasLimit gasPrice addressFrom addressTo (functionArgs:#FunctionMessage) =
+        this.ImpersonateAccount addressFrom
+
+        let txInput = functionArgs.CreateTransactionInput(addressTo)
+        
+        // ResolvedTODO
+        // this is going to cause you trouble later on
+        // consider later refactor
+        txInput.From <- addressFrom
+        txInput.Gas <- gasLimit
+        txInput.GasPrice <- gasPrice
+        txInput.Value <- weiValue
+
+        this.Web3Unsigned.TransactionManager.SendTransactionAndWaitForReceiptAsync(txInput, tokenSource = null)
+       
+    member this.MakeImpersonatedCallWithNoEtherAsync = this.MakeImpersonatedCallAsync (hexBigInt 0UL) (hexBigInt 0UL) (hexBigInt 0UL)
+    member this.MakeImpersonatedCallWithNoEther a b c = this.MakeImpersonatedCallWithNoEtherAsync a b c |> runNow
 
 type Profile = { FunctionName: string; Duration: string }
 
@@ -226,6 +265,15 @@ let makeAccount() =
     let privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
     Account(privateKey);
 
+let makeAccountWithBalance () =
+    let account = makeAccount()
+    
+    ethConn.GasPrice.Value * ethConn.Gas.Value * bigint 2
+    |> ethConn.SendEther account.Address
+    |> shouldSucceed
+
+    account
+
 let getABI str = Abi(__SOURCE_DIRECTORY__ + (sprintf "/../build/contracts/%s.json" str))
 
 let makeContract parameters contractName =
@@ -239,21 +287,24 @@ let padAddress (address:string) =
     
     (Array.replicate (bytesToPad * 2) '0' |> String) + addressWithout0x
 
-// TODO :
-// 1. rename
-// 2. consider moving impersonation step inside here (be careful)
-// 3. refactor into EthConn if appropriate
-// 4. Consider splitting into normal and Async
-// 5. Consider further specializing to retrieve receipt async and receipt sync
-let callFunctionWithoutSigning addressfrom addressTo (functionArgs:#FunctionMessage) =
-    let txInput = functionArgs.CreateTransactionInput(addressTo)
-    
-    // TODO
-    // this is going to cause you trouble later on
-    // consider later refactor
-    txInput.From <- addressfrom
-    txInput.Gas <- hexBigInt 9500000UL
-    txInput.GasPrice <- hexBigInt 0UL
-    txInput.Value <- hexBigInt 0UL
+let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
 
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow
+let bigintToByte size (a:BigInteger) = 
+    let bytes = a.ToByteArray()
+    bytes |> Array.ensureSize size |> Array.rev
+
+let doTimes x action = 
+    for _ in 1..x do
+        action ()
+
+let inline toBigDecimal (x:BigInteger) : BigDecimal = BigDecimal(x, 0);
+let inline toBigInt (x:BigDecimal) = x.Mantissa / BigInteger.Pow(bigint 10, -x.Exponent)
+
+let bigintDifference a b (precision:int) =
+    Math.Round(decimal <| toBigDecimal a / toBigDecimal b, precision)
+
+let toE18 (v:float) = 
+    BigDecimal(decimal v) * (toBigDecimal E18) |> toBigInt
+
+let balanceOf (contract:ContractPlug) address = 
+    contract.Query "balanceOf" [|address|]

@@ -30,13 +30,9 @@ type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
 
-module Array =
-    let ensureSize size array =
-        let paddingArray = Array.init size (fun _ -> byte 0)
-        Array.concat [|array;paddingArray|] |> Array.take size
-
-// TODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
+// ResolvedTODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
 // the constructed oracle itself
+// Resolution: It's already tested in the getEthDaiPrice test
 [<Specification("Oracle", "constructor", 0)>]
 [<Fact>]
 let ``inits to provided parameters`` () =
@@ -203,37 +199,14 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
     should equal expected actual
 
-let strToByte32 (str:string) = System.Text.Encoding.UTF8.GetBytes(str) |> Array.ensureSize 32
-
-
-// todo:
-// fix the issue with hardhat_reset
+// SkipTODO:
 // events emitted
-
-let bigintToByte size (a:BigInteger) = 
-    let bytes = a.ToByteArray()
-    bytes |> Array.ensureSize size |> Array.rev
-
-let doTimes x action = 
-    for _ in 1..x do
-        action ()
-
-let inline toBigDecimal (x:BigInteger) : BigDecimal = BigDecimal(x, 0);
-let inline toBigInt (x:BigDecimal) = x.Mantissa / BigInteger.Pow(bigint 10, -x.Exponent)
-
-let bigintDifference a b (precision:int) =
-    Math.Round(decimal <| toBigDecimal a / toBigDecimal b, precision)
-
-// todo urns and other vat values checks
-// excessCollateral and the urns values ought to both change as the speeds are executed
-// They should go down after defaulting, they should go up after the auction is complete and they (urns) should be 0 when the recapitalization is complete
-
-
+// revise the logic
 [<Specification("cdp", "bite", 0)>]
 [<Fact(Skip="Ended up being too complex, was removed from contract")>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
     // set-up the test
-    //ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [||])) |> runNowWithoutResult
+    ethConn.ResetAccount ()
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
@@ -249,7 +222,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
 
     // set mock oracle to our dEth to lead to the relevant maker oracle and initialize dEth
-    do callFunctionWithoutSigning ilkPIPAuthority pipAddress (KissFunction(A=oracleAdapter.Address)) |> ignore
+    ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (KissFunction(A=oracleAdapter.Address)) |> shouldSucceed
     oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
     let (_, dEthContract) = getDEthContractFromOracle oracleAdapter true
 
@@ -268,13 +241,13 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let wantedPriceBigInt = toBigInt wantedPrice
     
     // transfer cdp from the mainnet deth to the new dEth contract
-    do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> ignore
+    ethConn.MakeImpersonatedCallWithNoEther dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> shouldSucceed
 
     // set-up the test - end
 
     // STEP 1 - change price and check that excess collateral went down after price change by the percent that price was divided by.
     let mockDSValueContract = getMockDSValueFormat wantedPriceBigInt
-    do callFunctionWithoutSigning ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> ignore
+    ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> shouldSucceed
 
     // poke twice
     doTimes 2 <| (fun _ -> pokePIP pipAddress)
@@ -326,8 +299,8 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     // STEP 3 - open auction to sell the ilk in cdp
     let maxAuctionLengthInSeconds = bigint 50
     let maxBidLengthInSeconds = bigint 20
-    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> ignore
-    do callFunctionWithoutSigning ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = maxBidLengthInSeconds)) |> ignore
+    ethConn.MakeImpersonatedCallWithNoEther ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> shouldSucceed
+    ethConn.MakeImpersonatedCallWithNoEther ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = maxBidLengthInSeconds)) |> shouldSucceed
 
     let id = flipperContract.Query<bigint> "kicks" [||] // get the latest auction id
     
@@ -335,7 +308,7 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
     let expectedLot = bidsOutputDTO.Lot - bidsOutputDTO.Lot / bigint 10M // bid for 10% less lot.
 
     // emit Tab DAI in the VAT for the account that is bidding.
-    do callFunctionWithoutSigning spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab) |> ignore
+    ethConn.MakeImpersonatedCallWithNoEther spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab) |> shouldSucceed
 
     vatContract.ExecuteFunction "hope" [|flipperContract.Address|] |> shouldSucceed
     flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|] |> shouldSucceed
@@ -405,23 +378,15 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 [<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
-let ``dEth - automate - check that an authorised address can change the automation settings`` (address:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
-    let dEthContract = getDEthContractEthConn ()
+let ``dEth - automate - check that an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
+    ethConn.ResetAccount ()
+   
+    // ResolvedTODO : Hoist into getDEthContract...
 
-    // TODO : Hoist into getDEthContract...
-    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
-    cdpOwner |> shouldEqualIgnoringCase dEthContract.Address
-
-    let callingAddress = getAddressFromArg address dEthContract.Address
-    impersonateAccount callingAddress
-
-    let automateTxr = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected, 
+    let automateTxr = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected,
                                 BoostRatio = bigint boostRatioExpected, MinRedemptionRatio = bigint minRedemptionRatioExpected,
                                 AutomationFeePerc = bigint automationFeePercExpected, RiskLimit = bigint riskLimitExpected)
-                    |> callFunctionWithoutSigning callingAddress dEthContract.Address 
-                    |> ethConn.Web3.TransactionManager.TransactionReceiptService.PollForReceiptAsync
-                    |> runNow
+                    |> ethConn.MakeImpersonatedCallWithNoEther (mapInlineDataArgumentToAddress addressArgument dEthContract.Address) dEthContract.Address
 
     automateTxr |> shouldSucceed
 
@@ -430,117 +395,99 @@ let ``dEth - automate - check that an authorised address can change the automati
     dEthContract.Query<bigint> "riskLimit" [||] |> should equal <| bigint riskLimitExpected
 
     let event = automateTxr.DecodeAllEvents<AutomationSettingsChangedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
-
-    event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
-    event.BoostRatio |> should equal <| bigint boostRatioExpected
-    event.MinRedemptionRatio |> should equal <| bigint minRedemptionRatioExpected
     event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
     event.TargetRatio |> should equal <| bigint targetRatioExpected
+    event.BoostRatio |> should equal <| bigint boostRatioExpected
+    event.MinRedemptionRatio |> should equal <| bigint minRedemptionRatioExpected
+    event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
     event.RiskLimit |> should equal <| bigint riskLimitExpected
 
 [<Specification("dEth", "automate", 1)>]
 [<Theory>]
 [<InlineData(repaymentRatio, targetRatio, boostRatio, 1, 1, 1)>]
 let ``dEth - automate - check that an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
-    let dEthContract = getDEthContractEthConn ()
-
-    // TODO : hoist to getDEthContractEthConn
-    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
-    cdpOwner |> shouldEqualIgnoringCase dEthContract.Address
-
-    // TODO :
+    // ResolvedTODO:
     // 1. Catch the exception or check for it somehow, since the test is superfluous when calling via Debug
     // 2. Rather make an function to create a function that is seeded with some funds
-    let unauthorizedAccount = makeAccount()
-    ethConn.GasPrice.Value * ethConn.Gas.Value * bigint 2
-    |> ethConn.SendEther unauthorizedAccount.Address
-    |> shouldSucceed
-   
-    Debug <| EthereumConnection(hardhatURI, unauthorizedAccount.PrivateKey)
+    Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey)
     |> dEthContract.ExecuteFunctionFrom "automate" [|repaymentRatioExpected;targetRatioExpected;boostRatioExpected;minRedemptionRatioExpected;automationFeePercExpected;riskLimitExpected|]
     |> debug.DecodeForwardedEvents
     |> Seq.head
     |> shouldRevertWithUnknownMessage // To clarify : We get no message because the auth code reverts without providing one
 
-// TODO : 
+// ResolvedTODO : 
 // 1. Use numbers more on the order or E18
 [<Specification("dEth", "redeem", 0)>]
 [<Theory>]
-[<InlineData(100, 1)>]
-[<InlineData(1000000, 1)>]
-[<InlineData(1000000000UL, 1)>] 
-[<InlineData(100, 10)>]
-[<InlineData(1000000, 40)>]
-let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensAmount:int64) (riskLevelExceedCollateralRatio:int) =
-    let dEthContract = getDEthContractEthConn ()
-    let tokensAmount = bigint tokensAmount
-
+[<InlineData(100.0, 90.0, false)>]
+[<InlineData(10000.0, 700.0, false)>]
+[<InlineData(0.01, 0.005, false)>]
+[<InlineData(0.01, 0.005, true)>]
+[<InlineData(100.0, 70.0, true)>]
+[<InlineData(10000.0, 5000.0, true)>]
+let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensToMint:float) (tokensToRedeem:float) (riskLevelShouldBeExceeded:bool) =
     let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
-    dEthContract.ExecuteFunction "transfer" [|redeemerConnection.Account.Address;tokensAmount|] |> shouldSucceed
 
-    let getTokenBalance () = 
-        dEthContract.Query<bigint> "balanceOf" [|redeemerConnection.Account.Address|]
+    let tokensToTransferBigInt = tokensToMint |> toE18
+    let tokensToRedeemBigInt = tokensToRedeem |> toE18
 
-    let tokenBalanceBefore = getTokenBalance ()
-    tokenBalanceBefore |> should equal tokensAmount
+    tokensToRedeemBigInt |> should lessThan tokensToTransferBigInt
 
-    // TODO :
-    // 1. don't worry about addeing "Redeem" since most tests ought to contain only one action
-    let getGulperBalance () = gulper |> ethConn.GetEtherBalance
-    let gulperBalanceBeforeRedeem = getGulperBalance ()
+    dEthContract.ExecuteFunction "transfer" [|redeemerConnection.Account.Address;tokensToTransferBigInt|] |> shouldSucceed
 
-    let excessCollateral = dEthContract.Query<bigint> "getExcessCollateral" [||]
-    
-    // TODO : 
+    let tokenBalanceBefore = balanceOf dEthContract redeemerConnection.Account.Address
+
+    // ResolvedTODO:
+    // 1. don't worry about adding "Redeem" since most tests ought to contain only one action
+    let gulperBalanceBefore = getGulperEthBalance ()
+
+    // ResolvedTODO:
     // 1. Fix this
     // 2. Mark says "change this to raio"
     // 3. riskLevelExceedCollateralRatio rename please
-    excessCollateral - excessCollateral / bigint riskLevelExceedCollateralRatio
-    // riskLevel = excess - (excess / ratio) 
-    // | ratio == 0 -> exception
-    // | ratio == 1 -> 0
-    // | _ -> result < riskLevel
-    // riskLevel 
-    |> changeRiskLevel dEthContract
-    |> shouldSucceed
+
+    if riskLevelShouldBeExceeded then
+        makeRiskLimitLessThanExcessCollateral dEthContract |> shouldSucceed
 
     let receiverAddress = makeAccount().Address
-    let redeemTx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensAmount|]
+    
+    let redeemTx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensToRedeemBigInt|]
     redeemTx |> shouldSucceed
 
-    let (protocolFeeExpected, automationFeeExpected, collateralRedeemedExpected, collateralReturnedExpected) = getRedemptionValue dEthContract tokensAmount
+    let (protocolFeeExpected, automationFeeExpected, collateralRedeemedExpected, collateralReturnedExpected) = 
+        queryStateAndCalculateRedemptionValue dEthContract tokensToRedeemBigInt
 
     receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturnedExpected
-    getGulperBalance () |> should equal <| protocolFeeExpected + gulperBalanceBeforeRedeem
-    // TODO :
+    getGulperEthBalance () |> should equal (protocolFeeExpected + gulperBalanceBefore)
+
+    // ResolvedTODO:
     // 1. please change this to check balanceBefore against balanceAfter + redeemedTokens
     // 2. add a new variable that is always smaller than totalTokens given to redeemingAccount
-    getTokenBalance () |> should equal <| BigInteger.Zero
+    balanceOf dEthContract redeemerConnection.Account.Address |> should equal (tokenBalanceBefore - tokensToRedeemBigInt)
 
     let event = redeemTx.DecodeAllEvents<RedeemedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
-    // TODO : check that you check all the event values
+    // ResolvedTODO: check that you check all the event values
+    event.Redeemer |> shouldEqualIgnoringCase redeemerConnection.Account.Address
+    event.Receiver |> shouldEqualIgnoringCase receiverAddress
+    event.TokensRedeemed |> should equal tokensToRedeemBigInt
+    event.ProtocolFee |> should equal protocolFeeExpected
     event.AutomationFee |> should equal automationFeeExpected
     event.CollateralRedeemed |> should equal collateralRedeemedExpected
     event.CollateralReturned |> should equal collateralReturnedExpected
-    event.ProtocolFee |> should equal protocolFeeExpected
-    event.Receiver |> shouldEqualIgnoringCase receiverAddress
 
 [<Specification("dEth", "redeem", 1)>]
 [<Theory>]
 [<InlineData(10000)>]
 let ``dEth - redeem - check that someone without a balance can never redeem Ether`` tokensAmount =
-    let dEthContract = getDEthContractEthConn ()
-    let account = makeAccount()
-
-    // TODO : hoist into another function
-    ethConn.GasPrice.Value * ethConn.Gas.Value * bigint 2
-    |> ethConn.SendEther account.Address
-    |> shouldSucceed
-
-    // TODO
+    // ResolvedTODO:
     // 1. This only checks that Debug cannot redeem tokens? 
-    Debug <| EthereumConnection(hardhatURI, account.PrivateKey)
+    // Resolution: let's keep it this way, this way the code is much cleaner than if we do try-with stuff without Debug contract
+    // We cannot change the shouldThrowOnTransactionFailures setting via RPC - so we can't do that in the runtime
+    // So the only two options are:
+    // 1. catching stuff with try with, squeezing internal exception out of AggregateException 
+    // 2. going with Debug, and it seems more concise with Debug
+    // And the functionality is the same in both cases. 
+    Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey) // the balance is needed for gas vs for sending ether value.
     |> dEthContract.ExecuteFunctionFrom "redeem" [|makeAccount().Address;tokensAmount|]
     |> debug.DecodeForwardedEvents
     |> Seq.head
@@ -548,72 +495,68 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 
 [<Specification("dEth", "squanderMyEthForWorthlessBeans", 1)>]
 [<Theory>]
-// TODO :
+// ResolvedTODO:
 // 1. use small values, but also use values on the E15->E20 order
 // 2. Remove allowedInkDeviation
-[<InlineData(1000, 9)>]
-[<InlineData(0, 0)>] // https://trello.com/c/dUiUeVza/22-deth-squandermyethforworthlessbeans-check-that-no-one-providing-no-ether-can-issue-themselves-any-deth
-let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:int) (allowedInkDeviation:int) =
-    // TODO : 
+[<InlineData(100.0)>]
+[<InlineData(0.001)>]
+[<InlineData(0.0)>] // a test case checking that no-one providing no ether can issue themselves any deth
+let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
+    // ResolvedTODO:
     // 1.Consider creating *well constructed* helpers here
-    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
-    let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    
-    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
-        
-    let getGulperBalance () = gulper |> ethConn.GetEtherBalance
-    let gulperBalanceBeforeRedeem = getGulperBalance ()
-    let inkBefore = (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink
-
-    let dEthContract = getDEthContractEthConn ()
-
-    // TODO :
-    // 1. This will not be sufficient, you need to check the weiValue + excessCollateral against risk
-    // 2. the code has been corrected in .sol, also correct here please. 
-    dEthContract.Query<bigint> "getExcessCollateral" [||]
-    |> should lessThan (dEthContract.Query<bigint> "riskLimit" [||])
+    // Resolution - I moved all repeating starting / helping code to the dEthTestsBase
 
     let providedCollateralBigInt = bigint providedCollateral
-    let recipient = makeAccount().Address
-    // TODO : 
+
+    let inkBefore = getInk ()
+    let gulperBalanceBefore = getGulperEthBalance ()
+    
+    // ResolvedTODO:
+    // 1. This will not be sufficient, you need to check the providedCollateralBigInt + excessCollateral against risk
+    // 2. the code has been corrected in .sol, also correct here please. 
+    dEthContract.Query<bigint> "getExcessCollateral" [||]
+    |> should lessThan (dEthContract.Query<bigint> "riskLimit" [||] + providedCollateralBigInt)
+    
+    // ResolvedTODO:
+    // 1. Make more explicit - is it explicit enough? just renamed the function
+    // 2. Call before the squanderMyEthForWorthlessBeans
+    let (protocolFeeExpected, automationFeeExpected, actualCollateralAddedExpected, accreditedCollateralExpected, tokensIssuedExpected) = 
+        queryStateAndCalculateIssuanceAmount dEthContract providedCollateralBigInt
+
+    let dEthRecipientAddress = ethConn.Account.Address
+    let balanceBefore = balanceOf dEthContract dEthRecipientAddress
+
+    // ResolvedTODO:
     // 1. name all tx's that are actually txrs to txr
     // 2. more descriptive name
-    let tx = dEthContract.ExecuteFunctionFromAsyncWithValue providedCollateralBigInt "squanderMyEthForWorthlessBeans" [|recipient|] ethConn |> runNow
-    tx |> shouldSucceed
+    let squanderTxr = dEthContract.ExecuteFunctionFromAsyncWithValue providedCollateralBigInt "squanderMyEthForWorthlessBeans" [|dEthRecipientAddress|] ethConn |> runNow
+    squanderTxr |> shouldSucceed
 
-    // TODO :
-    // 1. Make more explicit
-    // 2. Call before the squanderMyEthForWorthlessBeans
-    let (protocolFeeExpected, automationFeeExpected, actualCollateralAddedExpected, accreditedCollateralExpected, tokensIssuedExpected) = getIssuanceAmount dEthContract providedCollateralBigInt
-   
-    // TODO : (more of a preference)
+    // ResolvedTODO: (more of a preference)
     // 1. rather have before + expeced = balanceOf
-    dEthContract.Query<bigint> "balanceOf" [|recipient|] |> should equal tokensIssuedExpected
-    (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink |> should (equalWithin <| bigint allowedInkDeviation) <| inkBefore + providedCollateralBigInt
-    getGulperBalance () |> should equal <| gulperBalanceBeforeRedeem + protocolFeeExpected
+    balanceOf dEthContract dEthRecipientAddress |> should equal (balanceBefore + tokensIssuedExpected)
+    getInk () |> should equal (inkBefore + providedCollateralBigInt)
+    getGulperEthBalance () |> should equal (gulperBalanceBefore + protocolFeeExpected)
 
-    let event = tx.DecodeAllEvents<IssuedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
+    let issuedEvent = squanderTxr.DecodeAllEvents<IssuedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
 
-    // TODO :
+    // ResolvedTODO:
     // 1. Reorder in same order as .sol
-    event.AutomationFee |> should equal automationFeeExpected
-    event.ProtocolFee |> should equal protocolFeeExpected
-    event.SuppliedCollateral |> should equal providedCollateralBigInt
-    event.Receiver |> shouldEqualIgnoringCase recipient
-    event.TokensIssued |> should equal tokensIssuedExpected
-    event.AccreditedCollateral |> should equal accreditedCollateralExpected
-    event.ActualCollateralAdded |> should equal actualCollateralAddedExpected
+    issuedEvent.Receiver |> shouldEqualIgnoringCase dEthRecipientAddress
+    issuedEvent.SuppliedCollateral |> should equal providedCollateralBigInt
+    issuedEvent.ProtocolFee |> should equal protocolFeeExpected
+    issuedEvent.AutomationFee |> should equal automationFeeExpected
+    issuedEvent.ActualCollateralAdded |> should equal actualCollateralAddedExpected
+    issuedEvent.AccreditedCollateral |> should equal accreditedCollateralExpected
+    issuedEvent.TokensIssued |> should equal tokensIssuedExpected
 
 [<Specification("dEth", "squanderMyEthForWorthlessBeans", 2)>]
 [<Fact>]
 let ``dEth - squanderMyEthForWorthlessBeans - check that the riskLevel cannot be exceeded`` () =
-    let dEthContract = getDEthContractEthConn ()
-    let excessCollateral = dEthContract.Query<bigint> "getExcessCollateral" [||]
-    // TODO :
+    // ResolvedTODO:
     // Please write in a cleared method.
-    let exceededRiskLevel = excessCollateral - excessCollateral / bigint 10
 
-    changeRiskLevel dEthContract exceededRiskLevel |> shouldSucceed
+    makeRiskLimitLessThanExcessCollateral dEthContract |> shouldSucceed
 
     debug
     |> dEthContract.ExecuteFunctionFrom "squanderMyEthForWorthlessBeans" [|makeAccount().Address|]

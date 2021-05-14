@@ -9,6 +9,7 @@ open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
 open Nethereum.JsonRpc.Client
 
 type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFunction
+type VatUrnsOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.UrnsOutputDTO
 
 module Array = 
     let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
@@ -64,6 +65,10 @@ let ethUsdMainnet = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
 let oracleContract = makeOracle makerOracle.Address daiUsdOracle.Address ethUsdOracle.Address
 let oracleContractMainnet = makeOracle makerOracleMainnet daiUsdMainnet ethUsdMainnet
 
+let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
+let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+let getGulperEthBalance () = gulper |> ethConn.GetEtherBalance
+
 let toMakerPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 18.0))).Mantissa
 let toMakerPriceFormat = decimal >> toMakerPriceFormatDecimal
 
@@ -109,9 +114,18 @@ let getDEthContract () =
 
 let getDEthContractEthConn () =
     let _, contract = getDEthContractFromOracle oracleContractMainnet true
+
     do ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
-    do callFunctionWithoutSigning dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> ignore
-    contract    
+    do makeImpersonatedCall dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> ignore
+
+    // check that we now own the cdp.
+    let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
+    let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
+    cdpOwner |> shouldEqualIgnoringCase contract.Address
+
+    contract
+
+let dEthContract = getDEthContractEthConn ()
 
 let getMockDSValueFormat (priceFormatted:BigInteger) =
     let mockDSValue = makeContract [||] "DSValueMock"
@@ -135,6 +149,10 @@ let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
         let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
         (ilkBytes, urn)
 
+let getInk () = 
+    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
+    (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink
+
 let findActiveCDP ilkArg =
     let cdpManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
@@ -156,7 +174,7 @@ let findActiveCDP ilkArg =
 
 let pokePIP pipAddress = 
     do ethConn.TimeTravel <| Constants.hours * 2UL
-    do callFunctionWithoutSigning ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
+    do makeImpersonatedCall ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
@@ -168,7 +186,7 @@ let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automat
 
     (protocolFee, automationFee, collateralRedeemed, collateralReturned)
 
-let getRedemptionValue (dEthContract:ContractPlug) tokensAmount =
+let queryStateAndCalculateRedemptionValue (dEthContract:ContractPlug) tokensAmount =
     let dEthQuery name = dEthContract.Query<bigint> name [||]
     calculateRedemptionValue tokensAmount (dEthQuery "totalSupply") (dEthQuery "getExcessCollateral") (dEthQuery "automationFeePerc")
 
@@ -181,27 +199,21 @@ let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollatera
     let tokensIssued = totalSupply * newTokenSupplyPerc / hundredPerc
     (protocolFee, automationFee, actualCollateralAdded, accreditedCollateral, tokensIssued)
 
-let getIssuanceAmount (dEthContract:ContractPlug) weiValue = 
+let queryStateAndCalculateIssuanceAmount (dEthContract:ContractPlug) weiValue = 
     let dEthQuery name = dEthContract.Query<bigint> name [||]
     calculateIssuanceAmount weiValue (dEthQuery "automationFeePerc") (dEthQuery "getExcessCollateral") (dEthQuery "totalSupply")
 
-let changeRiskLevel (dEthContract:ContractPlug) riskLimit =
+let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
     let dEthQuery name = dEthContract.Query<bigint> name [||]
+    let excessCollateral = dEthQuery "excessCollateral"
+
+    let ratioBetweenRiskLimitAndExcessCollateral = 0.9M
+    let riskLimit = toBigDecimal excessCollateral * BigDecimal(ratioBetweenRiskLimitAndExcessCollateral) |> toBigInt
     dEthContract.ExecuteFunction "automate" [| repaymentRatio;targetRatio;boostRatio; dEthQuery "minRedemptionRatio"; dEthQuery "automationFeePerc"; riskLimit |]
 
-let impersonateAccount (address:string) =
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
-
-// TODO : 
-// 1. give better name
-// 2. pattern match to string is antipattern
-type AddressArg =
-    | Owner
-    | Contract
-    | Address of string
-
-let getAddressFromArg arg contractAddress = 
-    match arg with 
-      | "owner" -> ethConn.Account.Address
-      | "contract" -> contractAddress
-      | _ -> arg
+// note: this is used to be able to specify owner and contract addresses in inlinedata (we cannot use DUs in attributes)
+let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress = 
+    match inlineDataArgument with
+      | "owner" -> ethConn.Account.Address // we assume that the called contract is "owned" by our connection
+      | "contract" -> calledContractAddress
+      | _ -> inlineDataArgument
