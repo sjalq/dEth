@@ -53,11 +53,17 @@ type IAsyncTxSender =
     abstract member SendTxAsync : string -> BigInteger -> string -> Task<TransactionReceipt>
 
 type EthereumConnection(nodeURI: string, privKey: string) =
+    let getWeb3Unsigned () = (Web3(nodeURI))
+    let getWeb3 () = Web3(Accounts.Account(privKey), nodeURI)
+    
+    let mutable web3Unsigned = getWeb3Unsigned ()
+    let mutable web3 = getWeb3 ()
+    
     member val public Gas = hexBigInt 9500000UL
     member val public GasPrice = hexBigInt 8000000000UL
-    member val public Account = Accounts.Account(privKey)
-    member val public Web3 = Web3(Accounts.Account(privKey), nodeURI)
-    member val public Web3Unsigned = (Web3(nodeURI))
+    member this.Account with get() = web3.TransactionManager.Account
+    member this.Web3 with get() = web3
+    member this.Web3Unsigned with get() = web3Unsigned
 
     interface IAsyncTxSender with
         member this.SendTxAsync toAddress value data = 
@@ -73,14 +79,14 @@ type EthereumConnection(nodeURI: string, privKey: string) =
 
     member this.DeployContractAsync (abi: Abi) (arguments: obj array) =
         this.Web3.Eth.DeployContract.SendRequestAndWaitForReceiptAsync(
-            abi.AbiString, 
-            abi.Bytecode, 
-            this.Account.Address, 
-            this.Gas, this.GasPrice, 
-            hexBigInt 0UL, 
-            null, 
+            abi.AbiString,
+            abi.Bytecode,
+            this.Account.Address,
+            this.Gas, this.GasPrice,
+            hexBigInt 0UL,
+            null,
             arguments)
-                
+
     member this.TimeTravel seconds =
         this.Web3.Client.SendRequestAsync(method = "evm_increaseTime", paramList = [| seconds |]) 
         |> Async.AwaitTask
@@ -102,10 +108,17 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member this.SendEther address amount =
         this.SendEtherAsync address amount |> runNow
 
-    member this.ResetAccount () =
-        this.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [||])) |> runNowWithoutResult
-        
-        match this.Account.NonceService with 
+    member this.ResetAccount blockNumber nonce =
+        let hardhatResetArg = {|
+            forking = {|
+                        jsonRpcUrl="https://eth-mainnet.alchemyapi.io/v2/5VaoQ3iNw3dVPD_PNwd5I69k3vMvdnNj";
+                        blockNumber=blockNumber
+            |}
+        |}
+
+        this.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [|hardhatResetArg|])) |> runNowWithoutResult
+
+        match this.Account.NonceService with
         | null -> () // nonceService is lazily inited, so if it's null, it means there were no txs and nonce is already 0
         | a -> a.ResetNonce () |> runNowWithoutResult
 
@@ -133,8 +146,8 @@ type EthereumConnection(nodeURI: string, privKey: string) =
 
         this.Web3Unsigned.TransactionManager.SendTransactionAndWaitForReceiptAsync(txInput, tokenSource = null)
        
-    member this.MakeImpersonatedCallWithNoEtherAsync = this.MakeImpersonatedCallAsync (hexBigInt 0UL) (hexBigInt 0UL) (hexBigInt 0UL)
-    member this.MakeImpersonatedCallWithNoEther a b c = this.MakeImpersonatedCallWithNoEtherAsync a b c |> runNow
+    member this.MakeImpersonatedCallWithNoEtherAsync addressFrom addressTo (functionArgs:#FunctionMessage) = this.MakeImpersonatedCallAsync (hexBigInt 0UL) (hexBigInt 9500000UL) (hexBigInt 0UL) addressFrom addressTo functionArgs
+    member this.MakeImpersonatedCallWithNoEther addressFrom addressTo (functionArgs:#FunctionMessage) = this.MakeImpersonatedCallWithNoEtherAsync addressFrom addressTo functionArgs |> runNow
 
 type Profile = { FunctionName: string; Duration: string }
 
@@ -235,6 +248,8 @@ let isRinkeby rinkeby notRinkeby =
 
 let ethConn =
     isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
+
+//do ethConn.ResetAccount 12330245 0 - this will make contractplug initializations revert without a reason in dethtestsbase
 
 let debug = Debug(ethConn)
 

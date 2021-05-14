@@ -6,10 +6,10 @@ open System.Numerics
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 open DETH2.Contracts.VatLike.ContractDefinition
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
-open Nethereum.JsonRpc.Client
+open Nethereum.RPC.Eth.DTOs
 
 type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFunction
-type VatUrnsOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.UrnsOutputDTO
+type VatUrnsOutputDTO = UrnsOutputDTO
 
 module Array = 
     let removeFromEnd elem = Array.rev >> Array.skipWhile (fun i -> i = elem) >> Array.rev
@@ -115,13 +115,14 @@ let getDEthContract () =
 let getDEthContractEthConn () =
     let _, contract = getDEthContractFromOracle oracleContractMainnet true
 
-    do ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
-    do makeImpersonatedCall dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> ignore
+    do ethConn.MakeImpersonatedCallWithNoEther dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> shouldSucceed
 
     // check that we now own the cdp.
     let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
     let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
     cdpOwner |> shouldEqualIgnoringCase contract.Address
+
+    (ethConn.Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync () |> runNow).Value |> printfn "%A"
 
     contract
 
@@ -174,7 +175,7 @@ let findActiveCDP ilkArg =
 
 let pokePIP pipAddress = 
     do ethConn.TimeTravel <| Constants.hours * 2UL
-    do makeImpersonatedCall ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
+    do ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
@@ -205,7 +206,7 @@ let queryStateAndCalculateIssuanceAmount (dEthContract:ContractPlug) weiValue =
 
 let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
     let dEthQuery name = dEthContract.Query<bigint> name [||]
-    let excessCollateral = dEthQuery "excessCollateral"
+    let excessCollateral = dEthQuery "getExcessCollateral"
 
     let ratioBetweenRiskLimitAndExcessCollateral = 0.9M
     let riskLimit = toBigDecimal excessCollateral * BigDecimal(ratioBetweenRiskLimitAndExcessCollateral) |> toBigInt
@@ -217,3 +218,9 @@ let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =
       | "owner" -> ethConn.Account.Address // we assume that the called contract is "owned" by our connection
       | "contract" -> calledContractAddress
       | _ -> inlineDataArgument
+
+let dEthInitializationsBlockNumber = (ethConn.Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync () |> runNow).Value
+printfn "%A" dEthInitializationsBlockNumber
+let dEthInitializationsNonce = ethConn.Web3.Eth.Transactions.GetTransactionCount.SendRequestAsync(ethConn.Account.Address, BlockParameter.CreatePending());
+
+let resetState () = ethConn.ResetAccount dEthInitializationsBlockNumber dEthInitializationsNonce

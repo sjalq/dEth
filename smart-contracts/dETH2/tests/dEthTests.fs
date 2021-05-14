@@ -375,11 +375,11 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
 [<Specification("dEth", "automate", 0)>]
 [<Theory>]
-[<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
-[<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
+//[<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
+//[<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
 let ``dEth - automate - check that an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
-    ethConn.ResetAccount ()
+    resetState ()
    
     // ResolvedTODO : Hoist into getDEthContract...
 
@@ -390,9 +390,9 @@ let ``dEth - automate - check that an authorised address can change the automati
 
     automateTxr |> shouldSucceed
 
-    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal <| bigint minRedemptionRatioExpected
-    dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal <| bigint automationFeePercExpected
-    dEthContract.Query<bigint> "riskLimit" [||] |> should equal <| bigint riskLimitExpected
+    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal (bigint minRedemptionRatioExpected)
+    dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal (bigint automationFeePercExpected)
+    dEthContract.Query<bigint> "riskLimit" [||] |> should equal (bigint riskLimitExpected)
 
     let event = automateTxr.DecodeAllEvents<AutomationSettingsChangedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
     event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
