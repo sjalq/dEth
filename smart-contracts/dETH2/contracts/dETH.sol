@@ -339,7 +339,7 @@ contract dEth is
         // 1. deposits eth into the vault 
         // 2. gives the holder a claim on the vault for later withdrawal
 
-        require(getExcessCollateral() < riskLimit.add(msg.Value), "risk limit exceeded");
+        require(getExcessCollateral() < riskLimit.add(msg.value), "risk limit exceeded");
 
         (uint protocolFee, 
         uint automationFee, 
