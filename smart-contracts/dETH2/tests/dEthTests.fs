@@ -206,7 +206,6 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 [<Fact(Skip="Ended up being too complex, was removed from contract")>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
     // set-up the test
-    ethConn.ResetAccount ()
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
@@ -375,12 +374,12 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 
 [<Specification("dEth", "automate", 0)>]
 [<Theory>]
-//[<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
-//[<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
+[<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
+[<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
 let ``dEth - automate - check that an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
-    resetState ()
-   
+    restore ()
+
     // ResolvedTODO : Hoist into getDEthContract...
 
     let automateTxr = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected,
@@ -406,6 +405,8 @@ let ``dEth - automate - check that an authorised address can change the automati
 [<Theory>]
 [<InlineData(repaymentRatio, targetRatio, boostRatio, 1, 1, 1)>]
 let ``dEth - automate - check that an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
+    restore ()
+
     // ResolvedTODO:
     // 1. Catch the exception or check for it somehow, since the test is superfluous when calling via Debug
     // 2. Rather make an function to create a function that is seeded with some funds
@@ -419,15 +420,15 @@ let ``dEth - automate - check that an unauthorised address cannot change the aut
 // 1. Use numbers more on the order or E18
 [<Specification("dEth", "redeem", 0)>]
 [<Theory>]
-[<InlineData(100.0, 90.0, false)>]
-[<InlineData(10000.0, 700.0, false)>]
+[<InlineData(10.0, 7.0, false)>]
+[<InlineData(1.0, 0.7, false)>]
 [<InlineData(0.01, 0.005, false)>]
-[<InlineData(0.01, 0.005, true)>]
-[<InlineData(100.0, 70.0, true)>]
-[<InlineData(10000.0, 5000.0, true)>]
+[<InlineData(0.001, 0.0005, false)>]
+[<InlineData(10.0, 7.0, true)>]
+[<InlineData(1.0, 0.05, true)>]
 let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensToMint:float) (tokensToRedeem:float) (riskLevelShouldBeExceeded:bool) =
-    //resetState () todo need to get snapshotid from rpc call
-    
+    restore ()
+
     let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
 
     let tokensToTransferBigInt = tokensToMint |> toE18
@@ -481,6 +482,8 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 [<Theory>]
 [<InlineData(10000)>]
 let ``dEth - redeem - check that someone without a balance can never redeem Ether`` tokensAmount =
+    restore ()
+
     // ResolvedTODO:
     // 1. This only checks that Debug cannot redeem tokens? 
     // Resolution: let's keep it this way, this way the code is much cleaner than if we do try-with stuff without Debug contract
@@ -504,6 +507,8 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 [<InlineData(0.001)>]
 [<InlineData(0.0)>] // a test case checking that no-one providing no ether can issue themselves any deth
 let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
+    restore ()
+
     // ResolvedTODO:
     // 1.Consider creating *well constructed* helpers here
     // Resolution - I moved all repeating starting / helping code to the dEthTestsBase
@@ -555,6 +560,8 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
 [<Specification("dEth", "squanderMyEthForWorthlessBeans", 2)>]
 [<Fact>]
 let ``dEth - squanderMyEthForWorthlessBeans - check that the riskLevel cannot be exceeded`` () =
+    restore ()
+
     // ResolvedTODO:
     // Please write in a cleared method.
 

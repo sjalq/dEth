@@ -220,7 +220,8 @@ let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =
       | "contract" -> calledContractAddress
       | _ -> inlineDataArgument
 
-// todo: get snapshotId
-let snapshotID = ethConn.Web3.Client.SendRequestAsync(new RpcRequest(0, "evm_snapshot", [||])) |> runNowWithoutResult
+let mutable snapshotId = ethConn.MakeSnapshot()
 
-let resetState () = ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "evm_revert", [|snapshotID|])) |> runNowWithoutResult
+let restore () =
+    ethConn.RestoreSnapshot snapshotId
+    snapshotId <- ethConn.MakeSnapshot ()

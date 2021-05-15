@@ -11,6 +11,7 @@ open Nethereum.Util
 open Nethereum.Contracts
 open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.RPC.Eth.DTOs
+open Nethereum.RPC.Infrastructure
 open Nethereum.Hex.HexTypes
 open Nethereum.JsonRpc.Client
 open FsUnit.Xunit
@@ -24,6 +25,9 @@ module Array =
     let ensureSize size array =
         let paddingArray = Array.init size (fun _ -> byte 0)
         Array.concat [|array;paddingArray|] |> Array.take size
+
+type GanacheEvmSnapshot(client) = 
+    inherit GenericRpcRequestResponseHandlerNoParam<string>(client, "evm_snapshot")
 
 let rnd = Random()
 
@@ -53,6 +57,7 @@ type IAsyncTxSender =
     abstract member SendTxAsync : string -> BigInteger -> string -> Task<TransactionReceipt>
 
 type EthereumConnection(nodeURI: string, privKey: string) =
+    
     let getWeb3Unsigned () = (Web3(nodeURI))
     let getWeb3 () = Web3(Accounts.Account(privKey), nodeURI)
     
@@ -108,20 +113,6 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member this.SendEther address amount =
         this.SendEtherAsync address amount |> runNow
 
-    member this.ResetAccount blockNumber nonce =
-        let hardhatResetArg = {|
-            forking = {|
-                        jsonRpcUrl="https://eth-mainnet.alchemyapi.io/v2/5VaoQ3iNw3dVPD_PNwd5I69k3vMvdnNj";
-                        blockNumber=blockNumber
-            |}
-        |}
-
-        this.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [|hardhatResetArg|])) |> runNowWithoutResult
-
-        match this.Account.NonceService with
-        | null -> () // nonceService is lazily inited, so if it's null, it means there were no txs and nonce is already 0
-        | a -> a.ResetNonce () |> runNowWithoutResult
-
     member this.ImpersonateAccount (address:string) =
         this.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
 
@@ -148,6 +139,15 @@ type EthereumConnection(nodeURI: string, privKey: string) =
        
     member this.MakeImpersonatedCallWithNoEtherAsync addressFrom addressTo (functionArgs:#FunctionMessage) = this.MakeImpersonatedCallAsync (hexBigInt 0UL) (hexBigInt 9500000UL) (hexBigInt 0UL) addressFrom addressTo functionArgs
     member this.MakeImpersonatedCallWithNoEther addressFrom addressTo (functionArgs:#FunctionMessage) = this.MakeImpersonatedCallWithNoEtherAsync addressFrom addressTo functionArgs |> runNow
+
+    member this.MakeSnapshotAsync () = GanacheEvmSnapshot(this.Web3.Client).SendRequestAsync()
+    member this.MakeSnapshot = this.MakeSnapshotAsync >> runNow
+
+    member this.RestoreSnapshot snapshotID =
+        this.Web3.Client.SendRequestAsync(new RpcRequest(1, "evm_revert", [|snapshotID|])) |> runNowWithoutResult
+        web3 <- getWeb3()
+        web3Unsigned <- getWeb3Unsigned()
+
 
 type Profile = { FunctionName: string; Duration: string }
 
@@ -249,7 +249,14 @@ let isRinkeby rinkeby notRinkeby =
 let ethConn =
     isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
 
-//do ethConn.ResetAccount 12330245 0 - this will make contractplug initializations revert without a reason in dethtestsbase
+// this is required if we want to be able to run dotnet test multiple times without having to restart hardhat
+//let hardhatResetArg = {|
+//    forking = {|
+//                jsonRpcUrl="https://eth-mainnet.alchemyapi.io/v2/5VaoQ3iNw3dVPD_PNwd5I69k3vMvdnNj";
+//                blockNumber=12330245
+//    |}
+//|}
+//ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [|hardhatResetArg|])) |> runNowWithoutResult
 
 let debug = Debug(ethConn)
 
