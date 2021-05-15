@@ -58,6 +58,7 @@ type IAsyncTxSender =
 
 type EthereumConnection(nodeURI: string, privKey: string) =
     
+    // this is needed to reset nonce.
     let getWeb3Unsigned () = (Web3(nodeURI))
     let getWeb3 () = Web3(Accounts.Account(privKey), nodeURI)
     
