@@ -513,7 +513,11 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 // 1. use small values, but also use values on the E15->E20 order
 // 2. Remove allowedInkDeviation
 [<InlineData(100.0)>]
+[<InlineData(10.0)>]
+[<InlineData(1.0)>]
+[<InlineData(0.01)>]
 [<InlineData(0.001)>]
+[<InlineData(0.0001)>]
 [<InlineData(0.0)>] // a test case checking that no-one providing no ether can issue themselves any deth
 let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
     restore ()
