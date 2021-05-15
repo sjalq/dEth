@@ -180,7 +180,9 @@ let pokePIP pipAddress =
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
+    printfn "redeemTokenSupplyPerc: %A" redeemTokenSupplyPerc
     let collateralAffected = excessCollateral * redeemTokenSupplyPerc / hundredPerc
+    printfn "collateralAffected: %A" collateralAffected
     let protocolFee = collateralAffected * protocolFeePercent / hundredPerc
     let automationFee = collateralAffected * automationFeePerc / hundredPerc;
     let collateralRedeemed = collateralAffected - automationFee; // how much capital should exit the dEth contract
