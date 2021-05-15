@@ -28,7 +28,7 @@ type VatUrnsOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.UrnsOutputDTO
 
 type System.String with
    member s1.icompare(s2: string) =
-     System.String.Equals(s1, s2, System.StringComparison.CurrentCultureIgnoreCase);
+     System.String.Equals(s1, s2, StringComparison.CurrentCultureIgnoreCase);
 
 // ResolvedTODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
 // the constructed oracle itself
@@ -36,6 +36,8 @@ type System.String with
 [<Specification("Oracle", "constructor", 0)>]
 [<Fact>]
 let ``inits to provided parameters`` () =
+    restore ()
+
     let (makerOracle, daiUsdOracle, ethUsdOracle) = (makeAccount().Address, makeAccount().Address, makeAccount().Address)
     let contract = makeOracle makerOracle daiUsdOracle ethUsdOracle
 
@@ -49,6 +51,8 @@ let ``inits to provided parameters`` () =
 [<InlineData(0.1)>]
 [<InlineData(0.12)>]
 let ``price is correct given source prices within ten percents of one another`` differencePercent =
+    restore ()
+
     let (priceMaker, _, priceNonMakerDaiEth, _) = initOraclesDefault differencePercent
 
     let price = oracleContract.Query<bigint> "getEthDaiPrice" [||]
@@ -63,6 +67,8 @@ let ``price is correct given source prices within ten percents of one another`` 
 [<Specification("dEth", "constructor", 0)>]
 [<Fact>]
 let ``initializes with correct values and rights assigned`` () =
+    restore ()
+
     let authority, contract = getDEthContractAndAuthority()
 
     // check the rights
@@ -86,6 +92,7 @@ let ``initializes with correct values and rights assigned`` () =
 [<Specification("dEth", "changeGulper", 0)>]
 [<Fact>]
 let ``can be changed by owner`` () =
+    restore ()
     let contract = getDEthContract ()
     let randomAddress = makeAccount().Address
     contract.ExecuteFunction "changeGulper" [|randomAddress|] |> ignore
@@ -94,6 +101,8 @@ let ``can be changed by owner`` () =
 [<Specification("dEth", "changeGulper", 1)>]
 [<Fact>]
 let ``cannot be changed by non-owner`` () = 
+    restore ()
+
     let contract = getDEthContract ()
     let account = Account(hardhatPrivKey2)
     let oldGulper = contract.Query<string> "gulper" [||]
@@ -105,37 +114,27 @@ let ``cannot be changed by non-owner`` () =
     shouldEqualIgnoringCase oldGulper <| contract.Query<string> "gulper" [||]
 
 let giveCDPToDSProxyTestBase shouldThrow = 
+    restore ()
+
     let newContract = getDEthContract ()
-
-    let cdpManagerContract = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
-
-    // impersonate the owner of cdp owner i.e the owner of deth on mainnet
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", dEthMainnetOwner)) |> runNowWithoutResult
-
-    // make a call from impersonated account
-    let data = Web3.Sha3("giveCDPToDSProxy(address)").Substring(0, 8) + padAddress newContract.Address
-    let txInput = new TransactionInput(data, addressTo = dEthMainnet, addressFrom = dEthMainnetOwner, gas = hexBigInt 9500000UL, value = hexBigInt 0UL);
-    (Web3(hardhatURI)).TransactionManager.SendTransactionAsync(txInput) |> runNow |> ignore
 
     let executeGiveCDPFromPrivateKey shouldThrow =
         let ethConn = if shouldThrow 
                             then (Debug(EthereumConnection(hardhatURI, hardhatPrivKey2)) :> IAsyncTxSender) 
                             else ethConn :> IAsyncTxSender
 
-        let giveCDPToDSProxyReceipt = newContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|dEthMainnet|] ethConn
+        let giveCDPToDSProxyReceipt = dEthContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|newContract.Address|] ethConn
         giveCDPToDSProxyReceipt
     
     let giveCDPToDSProxyReceipt = executeGiveCDPFromPrivateKey shouldThrow
 
     if shouldThrow
         then
-            // as a clean up, give cdp back from the valid owner
-            executeGiveCDPFromPrivateKey false |> ignore
-
             let forwardEvent = debug.DecodeForwardedEvents giveCDPToDSProxyReceipt |> Seq.head
-            shouldRevertWithUnknownMessage forwardEvent
-   
-    cdpManagerContract.Query<string> "owns" [|cdpId|] |> shouldEqualIgnoringCase dEthMainnet
+            forwardEvent |> shouldRevertWithUnknownMessage
+        else
+            giveCDPToDSProxyReceipt.Succeeded () |> should equal true
+        
 
 [<Specification("dEth", "giveCDPToDSProxy", 0)>]
 [<Fact>]
@@ -148,6 +147,8 @@ let ``dEth - giveCDPToDSProxy - cannot be called by non-owner`` () = giveCDPToDS
 [<Specification("dEth", "getCollateral", 0)>]
 [<Fact>]
 let ``dEth - getCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
+    restore ()
+
     let contract = getDEthContract ()
 
     let getCollateralOutput = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
@@ -162,6 +163,8 @@ let ``dEth - getCollateral - returns similar values as those directly retrieved 
 [<Specification("dEth", "getCollateralPriceRAY", 0)>]
 [<Fact>]
 let ``dEth - getCollateralPriceRAY - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
+    restore ()
+
     let contract = getDEthContract ()
 
     let ethDaiPrice = oracleContractMainnet.Query<bigint> "getEthDaiPrice" [||]
@@ -173,6 +176,8 @@ let ``dEth - getCollateralPriceRAY - returns similar values as those directly re
 [<Specification("dEth", "getExcessCollateral", 0)>]
 [<Fact>]
 let ``dEth - getExcessCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
+    restore ()
+
     let contract = getDEthContract ()
 
     let (_, _, _, _, _, excessCollateral) = getManuallyComputedCollateralValues oracleContractMainnet saverProxy cdpId
@@ -183,6 +188,8 @@ let ``dEth - getExcessCollateral - returns similar values as those directly retr
 [<Specification("dEth", "getRatio", 0)>]
 [<Fact>]
 let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
+    restore ()
+
     let contract = getDEthContract ()
     let saverProxyContract = ContractPlug(ethConn, (getABI "MCDSaverProxy"), saverProxy)
     let manager = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
@@ -205,6 +212,8 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 [<Specification("cdp", "bite", 0)>]
 [<Fact(Skip="Ended up being too complex, was removed from contract")>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
+    restore ()
+
     // set-up the test
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
     ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
