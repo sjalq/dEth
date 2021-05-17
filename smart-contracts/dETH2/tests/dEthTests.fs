@@ -463,11 +463,12 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 
     let receiverAddress = makeAccount().Address
     
+    let (protocolFeeExpected, automationFeeExpected, collateralRedeemedExpected, collateralReturnedExpected) = 
+        queryStateAndCalculateRedemptionValue dEthContract tokensToRedeemBigInt
+
     let redeemTx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensToRedeemBigInt|]
     redeemTx |> shouldSucceed
 
-    let (protocolFeeExpected, automationFeeExpected, collateralRedeemedExpected, collateralReturnedExpected) = 
-        queryStateAndCalculateRedemptionValue dEthContract tokensToRedeemBigInt
 
     printfn "protocolFeeExpected: %A automationFeeExpected: %A collateralRedeemedExpected: %A collateralReturnedExpected: %A"
             protocolFeeExpected automationFeeExpected collateralRedeemedExpected collateralReturnedExpected
