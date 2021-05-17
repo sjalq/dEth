@@ -559,7 +559,7 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
     // ResolvedTODO: (more of a preference)
     // 1. rather have before + expeced = balanceOf
     balanceOf dEthContract dEthRecipientAddress |> should equal (balanceBefore + tokensIssuedExpected)
-    //getInk () |> should equal (inkBefore + providedCollateralBigInt) // WIP
+    getInk () |> should equal (inkBefore + actualCollateralAddedExpected)
     getGulperEthBalance () |> should equal (gulperBalanceBefore + protocolFeeExpected)
 
     let issuedEvent = squanderTxr.DecodeAllEvents<IssuedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
