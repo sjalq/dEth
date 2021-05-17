@@ -123,8 +123,6 @@ let getDEthContractEthConn () =
     let cdpOwner = makerManagerContract.Query<string> "owns" [|cdpId|]
     cdpOwner |> shouldEqualIgnoringCase contract.Address
 
-    (ethConn.Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync () |> runNow).Value |> printfn "%A"
-
     contract
 
 let dEthContract = getDEthContractEthConn ()
@@ -180,9 +178,7 @@ let pokePIP pipAddress =
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
-    printfn "redeemTokenSupplyPerc: %A" redeemTokenSupplyPerc
     let collateralAffected = excessCollateral * redeemTokenSupplyPerc / hundredPerc
-    printfn "collateralAffected: %A" collateralAffected
     let protocolFee = collateralAffected * protocolFeePercent / hundredPerc
     let automationFee = collateralAffected * automationFeePerc / hundredPerc;
     let collateralRedeemed = collateralAffected - automationFee; // how much capital should exit the dEth contract

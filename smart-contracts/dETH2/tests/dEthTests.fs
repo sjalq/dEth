@@ -469,10 +469,6 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
     let redeemTx = redeemerConnection |> dEthContract.ExecuteFunctionFrom "redeem" [|receiverAddress;tokensToRedeemBigInt|]
     redeemTx |> shouldSucceed
 
-
-    printfn "protocolFeeExpected: %A automationFeeExpected: %A collateralRedeemedExpected: %A collateralReturnedExpected: %A"
-            protocolFeeExpected automationFeeExpected collateralRedeemedExpected collateralReturnedExpected
-
     receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturnedExpected
     getGulperEthBalance () |> should equal (protocolFeeExpected + gulperBalanceBefore)
 
