@@ -218,8 +218,10 @@ let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =
       | "contract" -> calledContractAddress
       | _ -> inlineDataArgument
 
+// this is a mechanism of being able to revert to the same snapshot over and over again.
+// when we call restore, the snapshot we restore to gets deleted. So we need to create a new one immediatelly after that.
+// this is put in this module because we need to get snapshot at the point when every static state in this module is initialized
 let mutable snapshotId = ethConn.MakeSnapshot()
-
 let restore () =
     ethConn.RestoreSnapshot snapshotId
     snapshotId <- ethConn.MakeSnapshot ()
