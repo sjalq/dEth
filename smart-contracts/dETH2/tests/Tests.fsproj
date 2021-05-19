@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp5.0</TargetFramework>
+    <UserSecretsId>09390700-778b-4f05-997a-c9ef9aa7012a</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Remove="ContractDefinition\**" />
@@ -35,6 +36,8 @@
     <PackageReference Include="FsCheck" Version="2.15.1" />
     <PackageReference Include="FsCheck.Xunit" Version="2.15.1" />
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="5.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
     <!--PackageReference Include="Nethereum.Web3" Version="5.0.101" /-->
     <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
@@ -44,5 +47,8 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit" Version="3.7.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Microsoft.Extensions.SecretManager.Tools" Version="2.0.0" />
   </ItemGroup>
 </Project>
