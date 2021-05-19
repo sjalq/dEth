@@ -29,6 +29,21 @@ module Array =
 type GanacheEvmSnapshot(client) = 
     inherit GenericRpcRequestResponseHandlerNoParam<string>(client, "evm_snapshot")
 
+type HardhatForkInput() =
+    [<JsonProperty(PropertyName = "jsonRpcUrl")>]
+    member val JsonRpcUrl = "" with get, set
+    [<JsonProperty(PropertyName = "blockNumber")>]
+    member val BlockNumber = 0UL with get, set
+
+type HardhatResetInput() =
+    [<JsonProperty(PropertyName = "forking")>]
+    member val Forking = HardhatForkInput() with get, set
+
+type HardhatReset(client) = 
+    inherit RpcRequestResponseHandler<bool>(client, "hardhat_reset")
+
+    member __.SendRequestAsync (input:HardhatResetInput) (id:obj) = base.SendRequestAsync(id, input);
+
 let rnd = Random()
 
 let rec rndRange min max  = 
@@ -60,7 +75,7 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     
     // this is needed to reset nonce.
     let getWeb3Unsigned () = (Web3(nodeURI))
-    let getWeb3 () = Web3(Accounts.Account(privKey), nodeURI)
+    let getWeb3 () = Web3(Account(privKey), nodeURI)
     
     let mutable web3Unsigned = getWeb3Unsigned ()
     let mutable web3 = getWeb3 ()
@@ -148,6 +163,10 @@ type EthereumConnection(nodeURI: string, privKey: string) =
         this.Web3.Client.SendRequestAsync(new RpcRequest(1, "evm_revert", [|snapshotID|])) |> runNowWithoutResult
         web3 <- getWeb3()
         web3Unsigned <- getWeb3Unsigned()
+
+    member this.HardhatResetAsync blockNumber url =
+        let input = HardhatResetInput(Forking=HardhatForkInput(BlockNumber=blockNumber,JsonRpcUrl=url))
+        HardhatReset(this.Web3.Client).SendRequestAsync input None
 
 
 type Profile = { FunctionName: string; Duration: string }
@@ -241,6 +260,8 @@ let ganacheMnemonic = "join topple vapor pepper sell enter isolate pact syrup sh
 let hardhatPrivKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 let hardhatPrivKey2 = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 let rinkebyPrivKey = "5ca35a65adbd49af639a3686d7d438dba1bcef97cf1593cd5dd8fd79ca89fa3c"
+let blockNumber = 12330245UL
+let alchemyKey = "<key>"
 
 let isRinkeby rinkeby notRinkeby =
     match useRinkeby with
@@ -250,14 +271,10 @@ let isRinkeby rinkeby notRinkeby =
 let ethConn =
     isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
 
-// this is required if we want to be able to run dotnet test multiple times without having to restart hardhat
-//let hardhatResetArg = {|
-//    forking = {|
-//                jsonRpcUrl="https://eth-mainnet.alchemyapi.io/v2/5VaoQ3iNw3dVPD_PNwd5I69k3vMvdnNj";
-//                blockNumber=12330245
-//    |}
-//|}
-//ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_reset", [|hardhatResetArg|])) |> runNowWithoutResult
+// reset the state to a particular block every time we start the tests to avoid having different state on different runs
+ethConn.HardhatResetAsync blockNumber (sprintf "https://eth-mainnet.alchemyapi.io/v2/%s" alchemyKey)
+|> runNow
+|> should equal true
 
 let debug = Debug(ethConn)
 
