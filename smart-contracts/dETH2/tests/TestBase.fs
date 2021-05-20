@@ -133,20 +133,11 @@ type EthereumConnection(nodeURI: string, privKey: string) =
     member this.ImpersonateAccount (address:string) =
         this.Web3.Client.SendRequestAsync(new RpcRequest(0, "hardhat_impersonateAccount", address)) |> runNowWithoutResult
 
-    // ResolvedTODO:
-    // 1. rename +
-    // 2. consider moving impersonation step inside here (be careful) +
-    // 3. refactor into EthConn if appropriate +
-    // 4. Consider splitting into normal and Async +
-    // 5. Consider further specializing to retrieve receipt async and receipt sync +
     member this.MakeImpersonatedCallAsync weiValue gasLimit gasPrice addressFrom addressTo (functionArgs:#FunctionMessage) =
         this.ImpersonateAccount addressFrom
 
         let txInput = functionArgs.CreateTransactionInput(addressTo)
         
-        // ResolvedTODO
-        // this is going to cause you trouble later on
-        // consider later refactor
         txInput.From <- addressFrom
         txInput.Gas <- gasLimit
         txInput.GasPrice <- gasPrice

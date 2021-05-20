@@ -30,9 +30,6 @@ type System.String with
    member s1.icompare(s2: string) =
      System.String.Equals(s1, s2, StringComparison.CurrentCultureIgnoreCase);
 
-// ResolvedTODO : please extend this to ensure that there is in fact a reading coming back from the underlying oracles and from
-// the constructed oracle itself
-// Resolution: It's already tested in the getEthDaiPrice test
 [<Specification("Oracle", "constructor", 0)>]
 [<Fact>]
 let ``inits to provided parameters`` () =
@@ -382,8 +379,6 @@ let ``biting of a CDP - should bite when collateral is < 150`` () =
 let ``dEth - automate - check that an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
     restore ()
 
-    // ResolvedTODO : Hoist into getDEthContract...
-
     let automateTxr = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected,
                                 BoostRatio = bigint boostRatioExpected, MinRedemptionRatio = bigint minRedemptionRatioExpected,
                                 AutomationFeePerc = bigint automationFeePercExpected, RiskLimit = bigint riskLimitExpected)
@@ -409,17 +404,12 @@ let ``dEth - automate - check that an authorised address can change the automati
 let ``dEth - automate - check that an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
     restore ()
 
-    // ResolvedTODO:
-    // 1. Catch the exception or check for it somehow, since the test is superfluous when calling via Debug
-    // 2. Rather make an function to create a function that is seeded with some funds
     Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey)
     |> dEthContract.ExecuteFunctionFrom "automate" [|repaymentRatioExpected;targetRatioExpected;boostRatioExpected;minRedemptionRatioExpected;automationFeePercExpected;riskLimitExpected|]
     |> debug.DecodeForwardedEvents
     |> Seq.head
     |> shouldRevertWithUnknownMessage // To clarify : We get no message because the auth code reverts without providing one
 
-// ResolvedTODO : 
-// 1. Use numbers more on the order or E18
 [<Specification("dEth", "redeem", 0)>]
 [<Theory>]
 [<InlineData(10.0, 7.0, false)>]
@@ -442,14 +432,7 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 
     let tokenBalanceBefore = balanceOf dEthContract redeemerConnection.Account.Address
 
-    // ResolvedTODO:
-    // 1. don't worry about adding "Redeem" since most tests ought to contain only one action
     let gulperBalanceBefore = getGulperEthBalance ()
-
-    // ResolvedTODO:
-    // 1. Fix this
-    // 2. Mark says "change this to raio"
-    // 3. riskLevelExceedCollateralRatio rename please
 
     if riskLevelShouldBeExceeded then
         makeRiskLimitLessThanExcessCollateral dEthContract |> shouldSucceed
@@ -465,13 +448,9 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
     receiverAddress |> ethConn.GetEtherBalance |> should equal collateralReturnedExpected
     getGulperEthBalance () |> should equal (protocolFeeExpected + gulperBalanceBefore)
 
-    // ResolvedTODO:
-    // 1. please change this to check balanceBefore against balanceAfter + redeemedTokens
-    // 2. add a new variable that is always smaller than totalTokens given to redeemingAccount
     balanceOf dEthContract redeemerConnection.Account.Address |> should equal (tokenBalanceBefore - tokensToRedeemBigInt)
 
     let event = redeemTx.DecodeAllEvents<RedeemedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
-    // ResolvedTODO: check that you check all the event values
     event.Redeemer |> shouldEqualIgnoringCase redeemerConnection.Account.Address
     event.Receiver |> shouldEqualIgnoringCase receiverAddress
     event.TokensRedeemed |> should equal tokensToRedeemBigInt
@@ -486,14 +465,6 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 let ``dEth - redeem - check that someone without a balance can never redeem Ether`` tokensAmount =
     restore ()
 
-    // ResolvedTODO:
-    // 1. This only checks that Debug cannot redeem tokens? 
-    // Resolution: let's keep it this way, this way the code is much cleaner than if we do try-with stuff without Debug contract
-    // We cannot change the shouldThrowOnTransactionFailures setting via RPC - so we can't do that in the runtime
-    // So the only two options are:
-    // 1. catching stuff with try with, squeezing internal exception out of AggregateException 
-    // 2. going with Debug, and it seems more concise with Debug
-    // And the functionality is the same in both cases. 
     Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey) // the balance is needed for gas vs for sending ether value.
     |> dEthContract.ExecuteFunctionFrom "redeem" [|makeAccount().Address;tokensAmount|]
     |> debug.DecodeForwardedEvents
@@ -502,9 +473,6 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 
 [<Specification("dEth", "squanderMyEthForWorthlessBeans", 1)>]
 [<Theory>]
-// ResolvedTODO:
-// 1. use small values, but also use values on the E15->E20 order
-// 2. Remove allowedInkDeviation
 [<InlineData(100.0)>]
 [<InlineData(10.0)>]
 [<InlineData(1.0)>]
@@ -515,46 +483,29 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
     restore ()
 
-    // ResolvedTODO:
-    // 1.Consider creating *well constructed* helpers here
-    // Resolution - I moved all repeating starting / helping code to the dEthTestsBase
-
     let providedCollateralBigInt = bigint providedCollateral
 
     let inkBefore = getInk ()
     let gulperBalanceBefore = getGulperEthBalance ()
     
-    // ResolvedTODO:
-    // 1. This will not be sufficient, you need to check the providedCollateralBigInt + excessCollateral against risk
-    // 2. the code has been corrected in .sol, also correct here please. 
     dEthContract.Query<bigint> "getExcessCollateral" [||]
     |> should lessThan (dEthContract.Query<bigint> "riskLimit" [||] + providedCollateralBigInt)
     
-    // ResolvedTODO:
-    // 1. Make more explicit - is it explicit enough? just renamed the function
-    // 2. Call before the squanderMyEthForWorthlessBeans
     let (protocolFeeExpected, automationFeeExpected, actualCollateralAddedExpected, accreditedCollateralExpected, tokensIssuedExpected) = 
         queryStateAndCalculateIssuanceAmount dEthContract providedCollateralBigInt
 
     let dEthRecipientAddress = ethConn.Account.Address
     let balanceBefore = balanceOf dEthContract dEthRecipientAddress
 
-    // ResolvedTODO:
-    // 1. name all tx's that are actually txrs to txr
-    // 2. more descriptive name
     let squanderTxr = dEthContract.ExecuteFunctionFromAsyncWithValue providedCollateralBigInt "squanderMyEthForWorthlessBeans" [|dEthRecipientAddress|] ethConn |> runNow
     squanderTxr |> shouldSucceed
 
-    // ResolvedTODO: (more of a preference)
-    // 1. rather have before + expeced = balanceOf
     balanceOf dEthContract dEthRecipientAddress |> should equal (balanceBefore + tokensIssuedExpected)
     getInk () |> should equal (inkBefore + actualCollateralAddedExpected)
     getGulperEthBalance () |> should equal (gulperBalanceBefore + protocolFeeExpected)
 
     let issuedEvent = squanderTxr.DecodeAllEvents<IssuedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
 
-    // ResolvedTODO:
-    // 1. Reorder in same order as .sol
     issuedEvent.Receiver |> shouldEqualIgnoringCase dEthRecipientAddress
     issuedEvent.SuppliedCollateral |> should equal providedCollateralBigInt
     issuedEvent.ProtocolFee |> should equal protocolFeeExpected
@@ -567,8 +518,6 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
 [<Fact>]
 let ``dEth - squanderMyEthForWorthlessBeans - check that the riskLevel cannot be exceeded`` () =
     restore ()
-    // ResolvedTODO:
-    // Please write in a cleared method.
 
     makeRiskLimitLessThanExcessCollateral dEthContract |> shouldSucceed
 
