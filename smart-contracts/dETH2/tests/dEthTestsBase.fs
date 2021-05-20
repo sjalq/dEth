@@ -6,8 +6,6 @@ open System.Numerics
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition
 open DETH2.Contracts.VatLike.ContractDefinition
 open DEth.Contracts.IMakerOracleAdvanced.ContractDefinition
-open Nethereum.RPC.Eth.DTOs
-open Nethereum.JsonRpc.Client
 
 type GiveFunctionCdp = DETH2.Contracts.ManagerLike.ContractDefinition.GiveFunction
 type VatUrnsOutputDTO = UrnsOutputDTO
@@ -29,7 +27,7 @@ let dEthMainnet = "0x5420dFecFaCcDAE68b406ce96079d37743Aa11Ae"
 
 let gulper = "0xa3cC915E9f1f81185c8C6efb00f16F100e7F07CA"
 let proxyCache = "0x271293c67E2D3140a0E9381EfF1F9b01E07B0795"
-let cdpId = bigint 18963 // https://defiexplore.com/cdp/18963
+let cdpId = bigint 18963
 let makerManager = "0x5ef30b9986345249bc32d8928B7ee64DE9435E39"
 let ethGemJoin = "0x2F0b23f53734252Bda2277357e97e1517d6B042A"
 let saverProxy = "0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47"
@@ -39,7 +37,7 @@ let initialRecipient = "0xb7c6bb064620270f8c1daa7502bcca75fc074cf4"
 let foundryTreasury = "0x93fE7D1d24bE7CB33329800ba2166f4D28Eaa553"
 let dsGuardFactory = "0x5a15566417e6C1c9546523066500bDDBc53F88C7"
 let cdpOwner = "0xBA1a28b8c69Bdb92d0c898A0938cd2814dc2cA5A"
-let cat = "0xa5679c04fc3d9d8b0aab1f0ab83555b301ca70ea" // the contract that bites
+let cat = "0xa5679c04fc3d9d8b0aab1f0ab83555b301ca70ea"
 let vat = "0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
 let spot = "0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3"
 let ilk = "ETH-A"
@@ -47,7 +45,6 @@ let ilkPIPAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 let ilkFlipper = "0xF32836B9E1f47a0515c6Ec431592D5EbC276407f"
 let ilkFlipperAuthority = "0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB"
 let daiMainnet = "0x6b175474e89094c44da98b954eedeac495271d0f"
-
 [<Literal>]
 let repaymentRatio = 180
 [<Literal>]
@@ -73,7 +70,6 @@ let getGulperEthBalance () = gulper |> ethConn.GetEtherBalance
 let toMakerPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 18.0))).Mantissa
 let toMakerPriceFormat = decimal >> toMakerPriceFormatDecimal
 
-// 8 places
 let toChainLinkPriceFormatDecimal (a:decimal) = (new BigDecimal(a) * (BigDecimal.Pow(10.0, 8.0))).Mantissa
 let toChainLinkPriceFormatInt (a:int) = toChainLinkPriceFormatDecimal <| decimal a
 
@@ -84,8 +80,8 @@ let initOracles priceMaker priceDaiUsd priceEthUsd =
 
 // percent is normalized to range [0, 1]
 let initOraclesDefault percentDiffNormalized =
-    let priceMaker = 10 // can be random value
-    let priceDaiUsd = 5 // can be random value
+    let priceMaker = 10 // can be any value
+    let priceDaiUsd = 5 // can be any value
     let priceNonMakerDaiEth = (decimal priceMaker + (decimal priceMaker) * percentDiffNormalized)
     let priceEthUsd = priceNonMakerDaiEth / decimal priceDaiUsd
     
@@ -115,8 +111,9 @@ let getDEthContract () =
 
 let getDEthContractEthConn () =
     let _, contract = getDEthContractFromOracle oracleContractMainnet true
-
-    do ethConn.MakeImpersonatedCallWithNoEther dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) |> shouldSucceed
+    
+    ethConn.MakeImpersonatedCallWithNoEther dEthMainnet makerManager (GiveFunctionCdp(Cdp = cdpId, Dst = contract.Address)) 
+    |> shouldSucceed
 
     // check that we now own the cdp.
     let makerManagerContract = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
@@ -145,11 +142,11 @@ let getManuallyComputedCollateralValues (oracleContract: ContractPlug) saverProx
     (priceEthDai, priceRay, saverProxy, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral)
 
 let getInkAndUrnFromCdp (cdpManagerContract:ContractPlug) cdpId =
-        let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
-        let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
-        (ilkBytes, urn)
+    let ilkBytes = cdpManagerContract.Query<byte[]> "ilks" [|cdpId|] |> Array.removeFromEnd (byte 0)
+    let urn = cdpManagerContract.Query<string> "urns" [|cdpId|]
+    (ilkBytes, urn)
 
-let getInk () = 
+let getInk () =
     let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
     (vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]).Ink
 
@@ -158,23 +155,23 @@ let findActiveCDP ilkArg =
     let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
     let maxCdpId = cdpManagerContract.Query<bigint> "cdpi" [||]
     
-    let cdpIds = ( Seq.initInfinite (fun i -> maxCdpId - bigint i) ) |> Seq.takeWhile (fun i -> i > BigInteger.Zero)
+    let cdpIds = (Seq.initInfinite (fun i -> maxCdpId - bigint i) ) |> Seq.takeWhile (fun i -> i > BigInteger.Zero)
 
     let getInkAndUrnFromCdp = getInkAndUrnFromCdp cdpManagerContract
-
-    let cdpId = Seq.findBack (fun cdpId ->
+    let isCDPActive cdpId =
         let (ilkBytes, urn) = getInkAndUrnFromCdp cdpId
         let ilk = System.Text.Encoding.UTF8.GetString(ilkBytes)
-
         let urnsOutput = vatContract.QueryObj<UrnsOutputDTO> "urns" [|ilk;urn|]
 
-        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg) cdpIds
+        urnsOutput.Art <> bigint 0 && urnsOutput.Ink <> bigint 0 && ilk = ilkArg
+
+    let cdpId = Seq.findBack isCDPActive cdpIds
 
     getInkAndUrnFromCdp cdpId
 
 let pokePIP pipAddress = 
-    do ethConn.TimeTravel <| Constants.hours * 2UL
-    do ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
+    ethConn.TimeTravel <| Constants.hours * 2UL
+    ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (PokeFunction()) |> ignore
 
 let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automationFeePerc =
     let redeemTokenSupplyPerc = tokensToRedeem * hundredPerc / totalSupply
@@ -182,7 +179,7 @@ let calculateRedemptionValue tokensToRedeem totalSupply excessCollateral automat
     let protocolFee = collateralAffected * protocolFeePercent / hundredPerc
     let automationFee = collateralAffected * automationFeePerc / hundredPerc;
     let collateralRedeemed = collateralAffected - automationFee; // how much capital should exit the dEth contract
-    let collateralReturned = collateralAffected - protocolFee - automationFee;
+    let collateralReturned = collateralAffected - protocolFee - automationFee; // how much capital should return to the user
 
     (protocolFee, automationFee, collateralRedeemed, collateralReturned)
 
@@ -193,10 +190,11 @@ let queryStateAndCalculateRedemptionValue (dEthContract:ContractPlug) tokensAmou
 let calculateIssuanceAmount suppliedCollateral automationFeePerc excessCollateral totalSupply =
     let protocolFee = suppliedCollateral * protocolFeePercent / hundredPerc
     let automationFee = suppliedCollateral * automationFeePerc / hundredPerc
-    let actualCollateralAdded = suppliedCollateral - protocolFee; // _protocolFee goes to the protocol 
-    let accreditedCollateral = actualCollateralAdded - automationFee; // _automationFee goes to the pool of funds in the cdp to offset gas implications
+    let actualCollateralAdded = suppliedCollateral - protocolFee; // protocolFee goes to the protocol 
+    let accreditedCollateral = actualCollateralAdded - automationFee; // automationFee goes to the pool of funds in the cdp to offset gas implications
     let newTokenSupplyPerc = accreditedCollateral * hundredPerc / excessCollateral
     let tokensIssued = totalSupply * newTokenSupplyPerc / hundredPerc
+    
     (protocolFee, automationFee, actualCollateralAdded, accreditedCollateral, tokensIssued)
 
 let queryStateAndCalculateIssuanceAmount (dEthContract:ContractPlug) weiValue = 
@@ -207,12 +205,12 @@ let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
     let dEthQuery name = dEthContract.Query<bigint> name [||]
     let excessCollateral = dEthQuery "getExcessCollateral"
 
-    let ratioBetweenRiskLimitAndExcessCollateral = 0.9M
+    let ratioBetweenRiskLimitAndExcessCollateral = 0.9M // hardcoded to be less than one - so that risk limit is less than excess collateral
     let riskLimit = toBigDecimal excessCollateral * BigDecimal(ratioBetweenRiskLimitAndExcessCollateral) |> toBigInt
-    dEthContract.ExecuteFunction "automate" [| repaymentRatio;targetRatio;boostRatio; dEthQuery "minRedemptionRatio"; dEthQuery "automationFeePerc"; riskLimit |]
+    dEthContract.ExecuteFunction "automate" [|repaymentRatio; targetRatio; boostRatio; dEthQuery "minRedemptionRatio"; dEthQuery "automationFeePerc"; riskLimit|]
 
 // note: this is used to be able to specify owner and contract addresses in inlinedata (we cannot use DUs in attributes)
-let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress = 
+let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =
     match inlineDataArgument with
       | "owner" -> ethConn.Account.Address // we assume that the called contract is "owned" by our connection
       | "contract" -> calledContractAddress

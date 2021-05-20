@@ -155,9 +155,11 @@ type EthereumConnection(nodeURI: string, privKey: string) =
         this.Web3Unsigned.TransactionManager.SendTransactionAndWaitForReceiptAsync(txInput, tokenSource = null)
        
     member this.MakeImpersonatedCallWithNoEtherAsync addressFrom addressTo (functionArgs:#FunctionMessage) = this.MakeImpersonatedCallAsync (hexBigInt 0UL) (hexBigInt 9500000UL) (hexBigInt 0UL) addressFrom addressTo functionArgs
+    
     member this.MakeImpersonatedCallWithNoEther addressFrom addressTo (functionArgs:#FunctionMessage) = this.MakeImpersonatedCallWithNoEtherAsync addressFrom addressTo functionArgs |> runNow
 
     member this.MakeSnapshotAsync () = GanacheEvmSnapshot(this.Web3.Client).SendRequestAsync()
+    
     member this.MakeSnapshot = this.MakeSnapshotAsync >> runNow
 
     member this.RestoreSnapshot snapshotID =
@@ -262,7 +264,6 @@ let hardhatPrivKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4
 let hardhatPrivKey2 = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 let rinkebyPrivKey = "5ca35a65adbd49af639a3686d7d438dba1bcef97cf1593cd5dd8fd79ca89fa3c"
 let blockNumber = 12330245UL
-let alchemyKey = ConfigurationBuilder().AddUserSecrets<HardhatForkInput>().Build().["AlchemyKey"]
 
 let isRinkeby rinkeby notRinkeby =
     match useRinkeby with
@@ -271,11 +272,6 @@ let isRinkeby rinkeby notRinkeby =
 
 let ethConn =
     isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
-
-// reset the state to a particular block every time we start the tests to avoid having different state on different runs
-ethConn.HardhatResetAsync blockNumber (sprintf "https://eth-mainnet.alchemyapi.io/v2/%s" alchemyKey)
-|> runNow
-|> should equal true
 
 let debug = Debug(ethConn)
 
@@ -349,3 +345,9 @@ let toE18 (v:float) =
 
 let balanceOf (contract:ContractPlug) address = 
     contract.Query "balanceOf" [|address|]
+
+// reset the state to a particular block every time we start the tests to avoid having different state on different runs
+let alchemyKey = ConfigurationBuilder().AddUserSecrets<HardhatForkInput>().Build().["AlchemyKey"]
+ethConn.HardhatResetAsync blockNumber (sprintf "https://eth-mainnet.alchemyapi.io/v2/%s" alchemyKey)
+|> runNow
+|> should equal true

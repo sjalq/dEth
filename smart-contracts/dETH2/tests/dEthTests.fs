@@ -102,7 +102,6 @@ let ``can be changed by owner`` () =
 [<Fact>]
 let ``cannot be changed by non-owner`` () = 
     restore ()
-
     let contract = getDEthContract ()
     let account = Account(hardhatPrivKey2)
     let oldGulper = contract.Query<string> "gulper" [||]
@@ -115,7 +114,6 @@ let ``cannot be changed by non-owner`` () =
 
 let giveCDPToDSProxyTestBase shouldThrow = 
     restore ()
-
     let newContract = getDEthContract ()
 
     let executeGiveCDPFromPrivateKey shouldThrow =
@@ -148,7 +146,6 @@ let ``dEth - giveCDPToDSProxy - cannot be called by non-owner`` () = giveCDPToDS
 [<Fact>]
 let ``dEth - getCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
     restore ()
-
     let contract = getDEthContract ()
 
     let getCollateralOutput = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
@@ -164,7 +161,6 @@ let ``dEth - getCollateral - returns similar values as those directly retrieved 
 [<Fact>]
 let ``dEth - getCollateralPriceRAY - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () = 
     restore ()
-
     let contract = getDEthContract ()
 
     let ethDaiPrice = oracleContractMainnet.Query<bigint> "getEthDaiPrice" [||]
@@ -177,7 +173,6 @@ let ``dEth - getCollateralPriceRAY - returns similar values as those directly re
 [<Fact>]
 let ``dEth - getExcessCollateral - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
     restore ()
-
     let contract = getDEthContract ()
 
     let (_, _, _, _, _, excessCollateral) = getManuallyComputedCollateralValues oracleContractMainnet saverProxy cdpId
@@ -189,7 +184,6 @@ let ``dEth - getExcessCollateral - returns similar values as those directly retr
 [<Fact>]
 let ``dEth - getRatio - returns similar values as those directly retrieved from the underlying contracts and calculated in F#`` () =
     restore ()
-
     let contract = getDEthContract ()
     let saverProxyContract = ContractPlug(ethConn, (getABI "MCDSaverProxy"), saverProxy)
     let manager = ContractPlug(ethConn, getABI "ManagerLike", makerManager)
@@ -208,7 +202,6 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
 // SkipTODO:
 // events emitted
-// revise the logic
 [<Specification("cdp", "bite", 0)>]
 [<Fact(Skip="Ended up being too complex, was removed from contract")>]
 let ``biting of a CDP - should bite when collateral is < 150`` () =
@@ -574,7 +567,6 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
 [<Fact>]
 let ``dEth - squanderMyEthForWorthlessBeans - check that the riskLevel cannot be exceeded`` () =
     restore ()
-
     // ResolvedTODO:
     // Please write in a cleared method.
 
