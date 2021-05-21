@@ -264,7 +264,6 @@ let isRinkeby rinkeby notRinkeby =
 let ethConn =
     isRinkeby (EthereumConnection(rinkebyURI, rinkebyPrivKey)) (EthereumConnection(hardhatURI, hardhatPrivKey))
 
-let debug = Debug(ethConn)
 
 let shouldEqualIgnoringCase (a: string) (b: string) =
     let aString = a |> string
@@ -342,3 +341,5 @@ let alchemyKey = ConfigurationBuilder().AddUserSecrets<HardhatForkInput>().Build
 ethConn.HardhatResetAsync blockNumber (sprintf "https://eth-mainnet.alchemyapi.io/v2/%s" alchemyKey)
 |> runNow
 |> should equal true
+
+let debug = Debug(ethConn)
