@@ -1,7 +1,5 @@
 pragma solidity ^0.5.17;
 
-import "./console.sol";
-
 contract DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool);
 }
@@ -104,10 +102,7 @@ contract DSProxy is DSAuth, DSNote {
         note
         returns (bytes32 response)
     {
-        console.log("2");
         require(_target != address(0));
-        console.log("3");
-
         
         assembly {
             let succeeded := delegatecall(

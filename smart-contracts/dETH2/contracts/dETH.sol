@@ -11,7 +11,6 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./DSMath.sol";
 import "./DSProxy.sol";
-import "./console.sol";
 
 contract IDSGuard is DSAuthority
 {
