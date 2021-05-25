@@ -171,11 +171,15 @@ contract dEth is
     address payable public gulper;
     uint public cdpId;
     
-    address public makerManager;
-    address public ethGemJoin;
+    // Note:
+    // Since these items are not available on test net and represent measurements
+    // on the larger DeFi ecosystem, they are directly addressed here with the understanding
+    // that testing occurs against simulated forks of the the Ethereum mainnet. 
+    address constant public makerManager = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+    address constant public ethGemJoin = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+    address constant public saverProxy = 0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47;
+    address constant public saverProxyActions = 0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038;
 
-    IMCDSaverProxy public saverProxy;
-    address public saverProxyActions;
     Oracle public oracle;
 
     // automation variables
@@ -185,42 +189,27 @@ contract dEth is
     
     constructor(
             address payable _gulper,
-            address _proxyCache,
             uint _cdpId,
-
-            address _makerManager,
-            address _ethGemJoin,
-            
-            IMCDSaverProxy _saverProxy,
-            address _saverProxyActions,
             Oracle _oracle,
-            
             address _initialRecipient,
-            
-            address _DSGuardFactory,
             address _FoundryTreasury)
         public
-        DSProxy(_proxyCache)
+        DSProxy(0x271293c67E2D3140a0E9381EfF1F9b01E07B0795) //_proxyCache_proxyCache
         ERC20Detailed("Derived Ether", "dEth", 18)
     {
         gulper = _gulper;
         cdpId = _cdpId;
 
-        makerManager = _makerManager;
-        ethGemJoin = _ethGemJoin;
-        saverProxy = _saverProxy;
-        saverProxyActions = _saverProxyActions;
         oracle = _oracle;
         minRedemptionRatio = 160;
-        automationFeePerc = ONE_PERC;           // 1.0%
+        automationFeePerc = ONE_PERC; // 1.0%
         riskLimit = 2000*10**18;      // sets an initial limit of 2000 ETH that the contract will risk. 
 
-        
         uint excess = getExcessCollateral();
         _mint(_initialRecipient, excess);
 
         // set the relevant authorities to make sure the parameters can be adjusted later on
-        IDSGuard guard = IDSGuardFactory(_DSGuardFactory).newGuard();
+        IDSGuard guard = IDSGuardFactory(0x5a15566417e6C1c9546523066500bDDBc53F88C7).newGuard(); // DSGuardFactory
         guard.permit(
             _FoundryTreasury,
             address(this),
@@ -261,7 +250,7 @@ contract dEth is
         returns(uint _priceRAY, uint _totalCollateral, uint _debt, uint _collateralDenominatedDebt, uint _excessCollateral)
     {
         _priceRAY = getCollateralPriceRAY();
-        (_totalCollateral, _debt,,) = saverProxy.getCdpDetailedInfo(cdpId);
+        (_totalCollateral, _debt,,) = IMCDSaverProxy(saverProxy).getCdpDetailedInfo(cdpId);
         _collateralDenominatedDebt = rdiv(_debt, _priceRAY);
         _excessCollateral = sub(_totalCollateral, _collateralDenominatedDebt);
     }
@@ -288,8 +277,8 @@ contract dEth is
         view
         returns(uint _ratio)
     {
-        (,,,bytes32 ilk) = saverProxy.getCdpDetailedInfo(cdpId);
-        _ratio = saverProxy.getRatio(cdpId, ilk);
+        (,,,bytes32 ilk) = IMCDSaverProxy(saverProxy).getCdpDetailedInfo(cdpId);
+        _ratio = IMCDSaverProxy(saverProxy).getRatio(cdpId, ilk);
     }
 
     function getMinRedemptionRatio()
