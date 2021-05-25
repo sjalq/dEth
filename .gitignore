@@ -18,3 +18,4 @@ smart-contracts/dETH2/tests/launch-remixd.sh
 smart-contracts/dETH2/tests/launch-hardhat.sh
 .DS_Store
 cache/
+smart-contracts/dETH2/contracts/flat.sol

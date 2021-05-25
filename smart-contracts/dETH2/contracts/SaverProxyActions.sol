@@ -271,8 +271,6 @@ contract SaverProxyActions is Common {
         uint cdp,
         address usr
     ) public {
-        console.log("give reached");
-
         ManagerLike(manager).give(cdp, usr);
 
         emit CDPAction('give', cdp, 0, 0);
