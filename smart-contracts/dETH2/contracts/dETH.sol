@@ -403,8 +403,8 @@ contract dEth is
 
         bytes memory freeETHProxyCall = abi.encodeWithSignature(
             "freeETH(address,address,uint256,uint256)",
-            makerManager, 
-            ethGemJoin, 
+            makerManager,
+            ethGemJoin,
             cdpId,
             collateralToFree);
         IDSProxy(address(this)).execute(saverProxyActions, freeETHProxyCall);

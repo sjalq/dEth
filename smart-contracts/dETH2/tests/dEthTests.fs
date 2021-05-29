@@ -83,7 +83,7 @@ let ``initializes with correct values and rights assigned`` () =
     shouldEqualIgnoringCase saverProxy (contract.Query<string> "saverProxy" [||])
     shouldEqualIgnoringCase saverProxyActions (contract.Query<string> "saverProxyActions" [||])
     shouldEqualIgnoringCase oracleContractMainnet.Address (contract.Query<string> "oracle" [||])
-    should equal true canCall   
+    should equal true canCall
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
 
 [<Specification("dEth", "changeGulper", 0)>]

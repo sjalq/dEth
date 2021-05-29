@@ -99,7 +99,7 @@ let getDEthContractFromOracle (oracleContract:ContractPlug) initialRecipientIsTe
 
     authority, contract
 
-let getDEthContractAndAuthority () = 
+let getDEthContractAndAuthority () =
     getDEthContractFromOracle oracleContractMainnet false
 
 let getDEthContract () = 
