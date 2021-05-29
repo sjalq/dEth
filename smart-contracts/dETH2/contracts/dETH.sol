@@ -176,7 +176,7 @@ contract dEth is
     // on the larger DeFi ecosystem, they are directly addressed here with the understanding
     // that testing occurs against simulated forks of the the Ethereum mainnet. 
     address constant public makerManager = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
-    address constant public ethGemJoin = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+    address constant public ethGemJoin = 0x2F0b23f53734252Bda2277357e97e1517d6B042A;
     address constant public saverProxy = 0xC563aCE6FACD385cB1F34fA723f412Cc64E63D47;
     address constant public saverProxyActions = 0x82ecD135Dce65Fbc6DbdD0e4237E0AF93FFD5038;
 
