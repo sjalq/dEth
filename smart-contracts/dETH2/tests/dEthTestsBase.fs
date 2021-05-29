@@ -92,10 +92,7 @@ let initOraclesDefault percentDiffNormalized =
 let getDEthContractFromOracle (oracleContract:ContractPlug) initialRecipientIsTestAccount =
     let initialRecipient = if initialRecipientIsTestAccount then ethConn.Account.Address else initialRecipient
 
-    let contract = makeContract [|
-        gulper;proxyCache;cdpId;makerManager;ethGemJoin;
-        saverProxy;saverProxyActions;oracleContract.Address;
-        initialRecipient;dsGuardFactory;foundryTreasury|] "dEth"
+    let contract = makeContract [|gulper;cdpId;oracleContract.Address;initialRecipient;foundryTreasury|] "dEth"
 
     let authorityAddress = contract.Query<string> "authority" [||]
     let authority = ContractPlug(ethConn, getABI "DSAuthority", authorityAddress)
