@@ -92,7 +92,7 @@ contract Oracle
         // we need it in the WAD format which has 18, therefore .mul(10**2) at the end
         uint chainlinkEthDaiPrice = uint(chainlinkEthUsdPrice).mul(uint(chainlinkDaiUsdPrice)).mul(10**2);
     
-        // if the differnce between the ethdai price from chainlink is more than 10% different from the
+        // if the differnce between the ethdai price from chainlink is more than 10% from the
         // maker oracle price, trust the maker oracle 
         uint percDiff = absDiff(makerEthUsdPrice, uint(chainlinkEthDaiPrice))
             .mul(HUNDRED_PERC)
@@ -112,7 +112,6 @@ contract Oracle
 }
 
 contract dEth is 
-    Context, 
     ERC20Detailed, 
     ERC20,
     DSMath,
@@ -129,8 +128,8 @@ contract dEth is
     uint public cdpId;
     
     // Note:
-    // Since these items are not available on test net and represent measurements
-    // on the larger DeFi ecosystem, they are directly addressed here with the understanding
+    // Since these items are not available on test net and represent interactions
+    // with the larger DeFi ecosystem, they are directly addressed here with the understanding
     // that testing occurs against simulated forks of the the Ethereum mainnet. 
     address constant public makerManager = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
     address constant public ethGemJoin = 0x2F0b23f53734252Bda2277357e97e1517d6B042A;
@@ -140,42 +139,49 @@ contract dEth is
     Oracle public oracle;
 
     // automation variables
-    uint public minRedemptionRatio;
-    uint public automationFeePerc;
-    uint public riskLimit; //sets the maximum amount of Eth the contract will risk, can also be used to retire the contract by setting it to 0
+    uint public minRedemptionRatioPercPoints; // the min % excess collateral that must remain after any ETH redeem action
+    uint public automationFeePerc;  // the fee that goes to the collateral pool, on entry or exit, to compensate for potentially triggering a boost or redeem
+    
+    // riskLimit sets the maximum amount of excess collateral Eth the contract will place at risk
+    // When exceeded it is no longer possible to issue dEth via the squander function
+    // This can also be used to retire the contract by setting it to 0
+    uint public riskLimit; 
     
     constructor(
             address payable _gulper,
             uint _cdpId,
             Oracle _oracle,
             address _initialRecipient,
-            address _FoundryTreasury)
+            address _automationAuthority)
         public
-        DSProxy(0x271293c67E2D3140a0E9381EfF1F9b01E07B0795) //_proxyCache_proxyCache
+        DSProxy(0x271293c67E2D3140a0E9381EfF1F9b01E07B0795) //_proxyCache on mainnet
         ERC20Detailed("Derived Ether", "dEth", 18)
     {
         gulper = _gulper;
         cdpId = _cdpId;
 
         oracle = _oracle;
+
+        // Initial values of automation variables
         minRedemptionRatio = 160;
         automationFeePerc = ONE_PERC; // 1.0%
-        riskLimit = 2000*10**18;      // sets an initial limit of 2000 ETH that the contract will risk. 
+        riskLimit = 1000*10**18;      // sets an initial limit of 1000 ETH that the contract will risk. 
 
+        // distributes the initial supply of dEth to the initial recipient at 1 ETH to 1 dEth
         uint excess = getExcessCollateral();
         _mint(_initialRecipient, excess);
 
-        // set the relevant authorities to make sure the parameters can be adjusted later on
+        // set the automation authority to make sure the parameters can be adjusted later on
         IDSGuard guard = IDSGuardFactory(0x5a15566417e6C1c9546523066500bDDBc53F88C7).newGuard(); // DSGuardFactory
         guard.permit(
-            _FoundryTreasury,
+            _automationAuthority,
             address(this),
             bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)")));
         setAuthority(guard);
 
         require(
             authority.canCall(
-                _FoundryTreasury, 
+                _automationAuthority, 
                 address(this), 
                 bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)"))),
             "guard setting failed");
@@ -244,9 +250,9 @@ contract dEth is
         returns(uint _minRatio)
     {
         // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
-        // set minRedemptionRatio to an integer value of discrete whole percentages for clarity 
+        // set minRedemptionRatioPercPoints to an integer value of discrete whole percentages for clarity 
         // and rather just multiply it by 10^9 here so that it is on the same order as getRatio() when comparing the two.
-        _minRatio = rdiv(minRedemptionRatio.mul(10**9), 100);
+        _minRatio = rdiv(minRedemptionRatioPercPoints.mul(10**9), 100);
     }
 
     function calculateIssuanceAmount(uint _suppliedCollateral)
