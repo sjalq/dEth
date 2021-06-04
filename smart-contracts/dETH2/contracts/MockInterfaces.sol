@@ -1,7 +1,18 @@
 pragma solidity ^0.5.17;
 
 import "./dETH.sol";
-import "./console.sol";
+
+contract IPriceFeed
+{
+    function post(uint128 val_, uint32 zzz_, address med_) public;
+}
+
+contract IMedianETHUSD
+{
+    function poke(
+    uint256[] calldata val_, uint256[] calldata age_,
+    uint8[] calldata v, bytes32[] calldata r, bytes32[] calldata s) external;
+}
 
 contract IFlipper
 {
@@ -145,8 +156,6 @@ contract MakerOracleAdapter
         returns (uint _price)
     {
         uint makerEthUsdPrice = uint(makerOracle.read());
-        console.log("result of reading", makerEthUsdPrice);
-
         return makerEthUsdPrice;
     }
 

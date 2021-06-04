@@ -1,14 +1,10 @@
-// Listen up degen!
-// This token is called dETH (death get it) because it will kill your hard earned money!
-// This contract has no tests, it was tested manually a little on Kovan!
-// This contract has no audit, so you're just plain insane if you give this thing a cent!
-// I know the guy who wrote this and I wouldn't trust him with mission critical code!
+// todo:
+// add disclaimer
 
 pragma solidity ^0.5.17;
 
 import "../../common.5/openzeppelin/token/ERC20/ERC20Detailed.sol";
 import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
-import "../../common.5/openzeppelin/GSN/Context.sol";
 import "./DSMath.sol";
 import "./DSProxy.sol";
 
@@ -17,10 +13,14 @@ contract IDSGuard is DSAuthority
     function permit(address src, address dst, bytes32 sig) public;
 }
 
-contract IDSGuardFactory {
+contract IDSGuardFactory 
+{
     function newGuard() public returns (IDSGuard guard);
 }
 
+// Note:
+// This is included to avoid method signature collisions between already imported 
+// DSProxy's two execute functions. 
 contract IDSProxy
 {
     function execute(address _target, bytes memory _data) public payable returns (bytes32);
@@ -45,55 +45,12 @@ contract IChainLinkPriceOracle
             uint80 answeredInRound);
 }
 
-contract IPriceFeed
-{
-    function post(uint128 val_, uint32 zzz_, address med_) public;
-}
-
-contract IMedianETHUSD
-{
-    function poke(
-    uint256[] calldata val_, uint256[] calldata age_,
-    uint8[] calldata v, bytes32[] calldata r, bytes32[] calldata s) external;
-}
-
 contract IMakerOracle
 {
     function read()
         public 
         view 
         returns(bytes32);
-}
-
-contract IVAT
-{
-    function urns(bytes32 ilk, address owner)
-        public
-        view
-        returns(uint256 ink, uint256 art);
-
-    function gem(bytes32 ilk, address owner)
-        public
-        view
-        returns (uint);
-}
-
-contract IMakerManager 
-{
-    function vat()
-        public
-        view
-        returns(IVAT);
-        
-    function ilks(uint256 cdpId)
-        public
-        view
-        returns(bytes32 ilk);
-
-    function urns (uint cdpId) 
-        public 
-        view
-        returns(address);      // CDPId => UrnHandler        
 }
 
 contract Oracle
