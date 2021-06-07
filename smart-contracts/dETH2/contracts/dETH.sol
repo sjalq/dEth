@@ -145,7 +145,7 @@ contract dEth is
     // riskLimit sets the maximum amount of excess collateral Eth the contract will place at risk
     // When exceeded it is no longer possible to issue dEth via the squander function
     // This can also be used to retire the contract by setting it to 0
-    uint public riskLimit; 
+    uint public riskLimit; // todo: what units is this variable in? Perc or PercPoints?
     
     constructor(
             address payable _gulper,
@@ -163,7 +163,7 @@ contract dEth is
         oracle = _oracle;
 
         // Initial values of automation variables
-        minRedemptionRatio = 160;
+        minRedemptionRatioPercPoints = 160;
         automationFeePerc = ONE_PERC; // 1.0%
         riskLimit = 1000*10**18;      // sets an initial limit of 1000 ETH that the contract will risk. 
 
@@ -328,8 +328,10 @@ contract dEth is
         returns (
             uint _protocolFee,
             uint _automationFee,
-            uint _collateralRedeemed, 
+            uint _collateralFreedFromCDP, // todo: "Redeemed" was comparably vague and confusing - not sure if this is the best forumalation but I think it's better. Feel free to tweak further.
             uint _collateralReturned)
+            // todo: I almost think THIS one should be called _collateralRedeemed - as this amount is going to the redeemer (or whoever he specifies)
+            // after all, collateral can be "returned" anywhere or to anything. But "redeemed" more directly implies that the redeemer/caller is the recipient - which is what this variable tracks.
     {
         // comment: a full check against the minimum ratio might be added in a future version
         // for now keep in mind that this function may return values greater than those that 
@@ -339,7 +341,7 @@ contract dEth is
         uint collateralAffected = getExcessCollateral().mul(redeemTokenSupplyPerc).div(HUNDRED_PERC);
         _protocolFee = collateralAffected.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
         _automationFee = collateralAffected.mul(automationFeePerc).div(HUNDRED_PERC);
-        _collateralRedeemed = collateralAffected.sub(_automationFee); // how much capital should exit the dEth contract
+        _collateralFreedFromCDP = collateralAffected.sub(_automationFee); // how much capital should exit the dEth contract
         _collateralReturned = collateralAffected.sub(_protocolFee).sub(_automationFee); // how much capital should return to the user
     }
 
@@ -349,7 +351,7 @@ contract dEth is
         uint _tokensRedeemed,
         uint _protocolFee,
         uint _automationFee,
-        uint _collateralRedeemed,
+        uint _collateralFreedFromCDP,
         uint _collateralReturned);
 
     function redeem(address _receiver, uint _tokensToRedeem)
@@ -377,7 +379,7 @@ contract dEth is
         (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
         require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
 
-        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
+        // Note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
         
         (bool payoutSuccess,) = _receiver.call.value(collateralToReturn)("");
         require(payoutSuccess, "eth send to receiver reverted");
@@ -397,23 +399,25 @@ contract dEth is
     }
     
     event AutomationSettingsChanged(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
-            uint _minRedemptionRatio,
-            uint _automationFeePerc,
-            uint _riskLimit);
+            uint _repaymentRatioPercPoints,
+            uint _targetRatioPercPoints,
+            uint _boostRatioPercPoints,
+            uint _minRedemptionRatioPercPoints,
+            uint _automationFeePercPoints,
+            uint _riskLimitPercPoitns);
 
     // note: all values used by defisaver are in WAD format
     // we do not need that level of precision on this method
-    // so for simplicity and readability they are all set in discrete percentages here
+    // so for simplicity and readability they are all set in discrete percentage points here
     function automate(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
-            uint _minRedemptionRatio,
-            uint _automationFeePerc,
-            uint _riskLimit)
+            uint _repaymentRatioPercPoints,
+            uint _targetRatioPercPoints,
+            uint _boostRatioPercPoints,
+            uint _minRedemptionRatioPercPoints,
+            uint _automationFeePercPoints,
+            // todo: confusion here. Should the above variable be a perc or percPoints unit?
+            // Here it seems it should be a PercPoints unit, but see below todo
+            uint _riskLimitPercPoints)
         public
         auth
     {
@@ -432,28 +436,30 @@ contract dEth is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
-        minRedemptionRatio = _minRedemptionRatio;
-        automationFeePerc = _automationFeePerc;
-        riskLimit = _riskLimit;
+        minRedemptionRatioPercPoints = _minRedemptionRatioPercPoints;
+        automationFeePerc = _automationFeePercPoints;
+        // todo: the above line is not right - but all I've done (I think) is clarified which units each variable should have.
+        // See other usages of automationFeePerc; it's clearly a Perc unit and not a PercPoints unit...
+        riskLimit = _riskLimitPercPoints;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            _repaymentRatio * 10**16, 
-            _boostRatio * 10**16,
-            _targetRatio * 10**16,
-            _targetRatio * 10**16,
+            _repaymentRatioPercPoints * 10**16, 
+            _boostRatioPercPoints * 10**16,
+            _targetRatioPercPoints * 10**16,
+            _targetRatioPercPoints * 10**16,
             true,
             true,
             subscriptions);
         IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
         
         emit AutomationSettingsChanged(
-            _repaymentRatio,
-            _targetRatio,
-            _boostRatio,
-            minRedemptionRatio,
-            automationFeePerc,
-            riskLimit);
+            _repaymentRatioPercPoints,
+            _targetRatioPercPoints,
+            _boostRatioPercPoints,
+            minRedemptionRatioPercPoints,
+            automationFeePercPoints, // todo: another symptom of the above confusion with units. What should the event be outputting?
+            riskLimitPercPoints);
     }
 }
