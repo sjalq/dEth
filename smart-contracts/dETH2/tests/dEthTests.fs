@@ -197,186 +197,12 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
     should equal expected actual
 
-// SkipTODO:
-// events emitted
-[<Specification("cdp", "bite", 0)>]
-[<Fact(Skip="Ended up being too complex, was removed from contract")>]
-let ``biting of a CDP - should bite when collateral is < 150`` () =
-    restore ()
-
-    // set-up the test
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(1, "hardhat_impersonateAccount", ilkPIPAuthority)) |> runNowWithoutResult
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(2, "hardhat_impersonateAccount", spot)) |> runNowWithoutResult
-    ethConn.Web3.Client.SendRequestAsync(new RpcRequest(3, "hardhat_impersonateAccount", dEthMainnet)) |> runNowWithoutResult
-
-    let catContract = ContractPlug(ethConn, getABI "ICat", cat)
-    let spotterContract = ContractPlug(ethConn, getABI "ISpotter", spot)
-    let flipperContract = ContractPlug(ethConn, getABI "IFlipper", ilkFlipper)
-    let vatContract = ContractPlug(ethConn, getABI "VatLike", vat)
-    let makerManagerAdvanced = ContractPlug(ethConn, getABI "IMakerManagerAdvanced", makerManager)
-    let oracleAdapter = makeContract [||] "MakerOracleAdapter"
-
-    let (ilk, urn) = getInkAndUrnFromCdp makerManagerAdvanced cdpId
-    let pipAddress = (spotterContract.QueryObj<SpotterIlksOutputDTO> "ilks" [|ilk|]).Pip
-
-    // set mock oracle to our dEth to lead to the relevant maker oracle and initialize dEth
-    ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (KissFunction(A=oracleAdapter.Address)) |> shouldSucceed
-    oracleAdapter.ExecuteFunction "setOracle" [|pipAddress|] |> shouldSucceed
-    let (_, dEthContract) = getDEthContractFromOracle oracleAdapter true
-
-    // transfer some tokens to the debug account so we can call functions that rely on the token balance from it
-    let debugTransferAmount = 10
-    dEthContract.ExecuteFunction "transfer" [|debug.ContractPlug.Address;debugTransferAmount|] |> shouldSucceed
-
-    // calculate price to make the ratio between total collateral and collateral denominated debt 145%
-    let currentPrice = oracleAdapter.Query<bigint> "getEthDaiPrice" [||]
-    let collateralOutputInitial = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let urnDTOInitial = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
-    let ratio = toBigDecimal collateralOutputInitial.TotalCollateral / toBigDecimal collateralOutputInitial.CollateralDenominatedDebt
-    let wantedRatio = 1.45M
-    let diff = ratio / BigDecimal wantedRatio
-    let wantedPrice = (toBigDecimal currentPrice / BigDecimal(diff))
-    let wantedPriceBigInt = toBigInt wantedPrice
-    
-    // transfer cdp from the mainnet deth to the new dEth contract
-    ethConn.MakeImpersonatedCallWithNoEther dEthMainnet makerManager (GiveFunction(Cdp = cdpId, Dst = dEthContract.Address)) |> shouldSucceed
-
-    // set-up the test - end
-
-    // STEP 1 - change price and check that excess collateral went down after price change by the percent that price was divided by.
-    let mockDSValueContract = getMockDSValueFormat wantedPriceBigInt
-    ethConn.MakeImpersonatedCallWithNoEther ilkPIPAuthority pipAddress (ChangeFunction(Src_ = mockDSValueContract.Address)) |> shouldSucceed
-
-    // poke twice
-    doTimes 2 <| (fun _ -> pokePIP pipAddress)
-    spotterContract.ExecuteFunction "poke" [|ilk|] |> shouldSucceed
-
-    let collateralOutputAfterPriceChange = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let urnDTOAfterPriceChange = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
-    should be (lessThan <| collateralOutputInitial.ExcessCollateral) collateralOutputAfterPriceChange.ExcessCollateral
-    should equal collateralOutputInitial.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral
-    let collateralDebtDiff = Math.Round(decimal (toBigDecimal collateralOutputAfterPriceChange.CollateralDenominatedDebt / toBigDecimal collateralOutputInitial.CollateralDenominatedDebt), 5)
-    let priceDiff = Math.Round((decimal diff), 5)
-    should equal priceDiff collateralDebtDiff
-
-    should equal urnDTOInitial.Art urnDTOAfterPriceChange.Art
-    should equal urnDTOInitial.Ink urnDTOAfterPriceChange.Ink
-
-    let gemAmountBeforeBite = vatContract.Query<bigint> "gem" [|ilk; urn|]
-
-    // STEP 2 - bite, current excessCollateral should be within 0-35% of the excess collateral before biting. as the vat.grab() is called and the vault gets liquidated.
-    // kick is called, guy is CDP manager vs our account
-    catContract.ExecuteFunction "bite" [|ilk;urn|] |> shouldSucceed
-
-    let urnDTOAfterBite = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
-    let gemAmountAfterBite = vatContract.Query<bigint> "gem" [|ilk; urn|]
-    let collateralOutputAfterBite = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let percentDiff = bigintDifference collateralOutputAfterBite.Debt collateralOutputAfterPriceChange.Debt 4
-    let percentTotalCollateral = bigintDifference collateralOutputAfterBite.TotalCollateral collateralOutputAfterPriceChange.TotalCollateral 4
-    let percentTotalExcessCollateral = bigintDifference collateralOutputAfterBite.ExcessCollateral collateralOutputAfterPriceChange.ExcessCollateral 4
-    let percentCollateralDenominatedDebt = bigintDifference collateralOutputAfterBite.CollateralDenominatedDebt collateralOutputAfterPriceChange.CollateralDenominatedDebt 4
-    let percentArt = bigintDifference urnDTOAfterBite.Art urnDTOAfterPriceChange.Art 4
-    let percentInk = bigintDifference urnDTOAfterBite.Ink urnDTOAfterPriceChange.Ink 4
-
-    should lessThanOrEqualTo 35M percentDiff
-    should equal percentDiff percentTotalCollateral
-    should equal percentDiff percentTotalExcessCollateral
-    should equal percentDiff percentCollateralDenominatedDebt
-    should equal percentDiff percentArt
-    should equal percentDiff percentInk
-    should equal gemAmountBeforeBite gemAmountAfterBite
-
-    // redeem should revert
-    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|ethConn.Account.Address;10|] debug
-    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithMessage "cannot violate collateral safety ratio"
-
-    // squander should revert as well
-    //let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] debug |> runNow
-    //debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
-
-    // STEP 3 - open auction to sell the ilk in cdp
-    let maxAuctionLengthInSeconds = bigint 50
-    let maxBidLengthInSeconds = bigint 20
-    ethConn.MakeImpersonatedCallWithNoEther ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "tau", Data = maxAuctionLengthInSeconds)) |> shouldSucceed
-    ethConn.MakeImpersonatedCallWithNoEther ilkFlipperAuthority ilkFlipper (FileFunction(What = strToByte32 "ttl", Data = maxBidLengthInSeconds)) |> shouldSucceed
-
-    let id = flipperContract.Query<bigint> "kicks" [||] // get the latest auction id
-    
-    let bidsOutputDTO = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
-    let expectedLot = bidsOutputDTO.Lot - bidsOutputDTO.Lot / bigint 10M // bid for 10% less lot.
-
-    // emit Tab DAI in the VAT for the account that is bidding.
-    ethConn.MakeImpersonatedCallWithNoEther spot vat <| SuckFunction(U = ethConn.Account.Address, V = ethConn.Account.Address, Rad = bidsOutputDTO.Tab) |> shouldSucceed
-
-    vatContract.ExecuteFunction "hope" [|flipperContract.Address|] |> shouldSucceed
-    flipperContract.ExecuteFunction "tend" [|id;bidsOutputDTO.Lot;bidsOutputDTO.Tab|] |> shouldSucceed
-    flipperContract.ExecuteFunction "dent" [|id;expectedLot;bidsOutputDTO.Tab|] |> shouldSucceed
-
-    // here bids guy should be our account
-    // Flipper.tend moves the bid (DAI) amount to the VOW
-    // Flipper.dent moves avaiable (10%) collateral from flipper to the usr - vault address, bids.lot - lot. (so, it should be 10% of the lot). It impacts gem mapping, but in the test we are quering urns.
-    // Flipper.deal moves remaining (90%) collateral from flipper to bid.guy
-    // bug ? - flux - transfers collateral between users, but doesn't update Urn.ink
-    // but - it goes to the owner of the vault vs the vault itself (which makes sense as it's being liquidated)
-
-    // retrieve the bids data before calling deal, because it is removed during deal execution.
-    let bidsOutputDTOAfterAuction = flipperContract.QueryObj<BidsOutputDTO> "bids" [|id|]
-
-    // end the auction
-    ethConn.TimeTravel maxAuctionLengthInSeconds
-    flipperContract.ExecuteFunction "deal" [|id|] |> shouldSucceed
-
-    // after hope/tend/dent/deal - the gem amount should go up, collateral and urn shouldn't change.
-    // The guy should be hardhat's first account's address.
-    // We shouldn't be able to redeem.
-    let urnDTOAfterAuctionEnd = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
-    let gemAmountAfterAuctionEnd = vatContract.Query<bigint> "gem" [|ilk; urn|]
-    let collateralOutputAfterAuctionEnd = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-
-    should equal (gemAmountAfterBite + (bidsOutputDTO.Lot - bidsOutputDTOAfterAuction.Lot)) gemAmountAfterAuctionEnd
-    should equal expectedLot bidsOutputDTOAfterAuction.Lot
-    shouldEqualIgnoringCase ethConn.Account.Address bidsOutputDTOAfterAuction.Guy
-
-    should equal collateralOutputAfterBite.ExcessCollateral collateralOutputAfterAuctionEnd.ExcessCollateral
-    should equal urnDTOAfterBite.Art urnDTOAfterAuctionEnd.Art
-    should equal urnDTOAfterBite.Ink urnDTOAfterAuctionEnd.Ink
-
-    // redeem should revert
-    let redeemFailTx = dEthContract.ExecuteFunctionFrom "redeem" [|Account(hardhatPrivKey).Address;10|] debug
-    debug.DecodeForwardedEvents redeemFailTx |> Seq.head |> shouldRevertWithMessage "cannot violate collateral safety ratio"
-
-    // squander should revert as well
-    //let squanderTx = dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|ethConn.Account.Address|] debug |> runNow
-    //debug.DecodeForwardedEvents squanderTx |> Seq.head |> shouldRevertWithUnknownMessage
-
-    // STEP 4: MoveVatEthToCDP
-    // need to check that vat eth was indeed moved and that excess collateral is up again.
-    dEthContract.ExecuteFunction "moveVatEthToCDP" [||] |> shouldSucceed
-    
-    let collateralOutputAfterMoveVat = dEthContract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let urnDTOAfterMoveVat = vatContract.QueryObj<VatUrnsOutputDTO> "urns" [|ilk; urn|]
-    let gemAmountAfterMoveVat = vatContract.Query<bigint> "gem" [|ilk; urn|]
-
-    should equal (urnDTOAfterAuctionEnd.Ink + gemAmountAfterAuctionEnd) urnDTOAfterMoveVat.Ink
-    should equal urnDTOAfterAuctionEnd.Art urnDTOAfterMoveVat.Art
-    should equal BigInteger.Zero gemAmountAfterMoveVat
-    should greaterThan collateralOutputAfterAuctionEnd.TotalCollateral collateralOutputAfterMoveVat.TotalCollateral
-
-    // STEP 5: check that we can redeem and that the account has ether after the redeem call
-    let address = makeAccount().Address
-    dEthContract.ExecuteFunction "redeem" [|address;(collateralOutputAfterMoveVat.TotalCollateral - collateralOutputAfterAuctionEnd.TotalCollateral)|] |> shouldSucceed
-    should greaterThan (bigint 0) <| ethConn.GetEtherBalance(address)
-
-    // check that we can squander and that we have received ERC20 tokens
-    dEthContract.ExecuteFunctionFromAsyncWithValue (BigInteger(500)) "squanderMyEthForWorthlessBeans" [|address|] ethConn |> runNow |> shouldSucceed
-    should greaterThan (bigint 0) <| dEthContract.Query<bigint> "balanceOf" [|address|]
-
 [<Specification("dEth", "automate", 0)>]
 [<Theory>]
 [<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
-let ``dEth - automate - check that an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
+let ``dEth - automate - an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
     restore ()
 
     let automateTxr = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected,
@@ -401,7 +227,7 @@ let ``dEth - automate - check that an authorised address can change the automati
 [<Specification("dEth", "automate", 1)>]
 [<Theory>]
 [<InlineData(repaymentRatio, targetRatio, boostRatio, 1, 1, 1)>]
-let ``dEth - automate - check that an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
+let ``dEth - automate - an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
     restore ()
 
     Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey)
@@ -418,7 +244,7 @@ let ``dEth - automate - check that an unauthorised address cannot change the aut
 [<InlineData(0.001, 0.0005, false)>]
 [<InlineData(10.0, 7.0, true)>]
 [<InlineData(1.0, 0.05, true)>]
-let ``dEth - redeem - check that someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensToMint:float) (tokensToRedeem:float) (riskLevelShouldBeExceeded:bool) =
+let ``dEth - redeem - someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensToMint:float) (tokensToRedeem:float) (riskLevelShouldBeExceeded:bool) =
     restore ()
 
     let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)
@@ -462,7 +288,7 @@ let ``dEth - redeem - check that someone with a positive balance of dEth can red
 [<Specification("dEth", "redeem", 1)>]
 [<Theory>]
 [<InlineData(10000)>]
-let ``dEth - redeem - check that someone without a balance can never redeem Ether`` tokensAmount =
+let ``dEth - redeem - someone without a balance can never redeem Ether`` tokensAmount =
     restore ()
 
     Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey) // the balance is needed for gas vs for sending ether value.
@@ -480,7 +306,7 @@ let ``dEth - redeem - check that someone without a balance can never redeem Ethe
 [<InlineData(0.001)>]
 [<InlineData(0.0001)>]
 [<InlineData(0.0)>] // a test case checking that no-one providing no ether can issue themselves any deth
-let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
+let ``dEth - squanderMyEthForWorthlessBeans - anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
     restore ()
 
     let providedCollateralBigInt = bigint providedCollateral
@@ -516,7 +342,7 @@ let ``dEth - squanderMyEthForWorthlessBeans - check that anyone providing a posi
 
 [<Specification("dEth", "squanderMyEthForWorthlessBeans", 2)>]
 [<Fact>]
-let ``dEth - squanderMyEthForWorthlessBeans - check that the riskLevel cannot be exceeded`` () =
+let ``dEth - squanderMyEthForWorthlessBeans - the riskLevel cannot be exceeded`` () =
     restore ()
 
     makeRiskLimitLessThanExcessCollateral dEthContract |> shouldSucceed
