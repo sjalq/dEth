@@ -443,7 +443,7 @@ contract dEth is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
-        minRedemptionRatioPerc = _minRedemptionRatioPerc;
+        minRedemptionRatioPerc = _minRedemptionRatioPerc * ONE_PERC;
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
 

@@ -204,7 +204,7 @@ let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
 
     let ratioBetweenRiskLimitAndExcessCollateral = 0.9M // hardcoded to be less than one - so that risk limit is less than excess collateral
     let riskLimit = toBigDecimal excessCollateral * BigDecimal(ratioBetweenRiskLimitAndExcessCollateral) |> toBigInt
-    dEthContract.ExecuteFunction "automate" [|repaymentRatio; targetRatio; boostRatio; dEthQuery "minRedemptionRatio"; dEthQuery "automationFeePerc"; riskLimit|]
+    dEthContract.ExecuteFunction "automate" [|repaymentRatio; targetRatio; boostRatio; dEthQuery "minRedemptionRatioPerc"; dEthQuery "automationFeePerc"; riskLimit|]
 
 // note: this is used to be able to specify owner and contract addresses in inlinedata (we cannot use DUs in attributes)
 let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =

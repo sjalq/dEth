@@ -220,7 +220,7 @@ let ``dEth - automate - an authorised address can change the automation settings
 
     automateTxr |> shouldSucceed
 
-    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal (bigint minRedemptionRatioExpected)
+    dEthContract.Query<bigint> "minRedemptionRatioPerc" [||] |> should equal (bigint minRedemptionRatioExpected)
     dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal (bigint automationFeePercExpected)
     dEthContract.Query<bigint> "riskLimit" [||] |> should equal (bigint riskLimitExpected)
 
