@@ -9,18 +9,12 @@ open Constants
 open TestBase
 open dEthTestsBase
 open Nethereum.Web3
-open Nethereum.Util
 open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Web3.Accounts
-open Nethereum.JsonRpc.Client
 open Nethereum.RPC.Eth.DTOs
 open Nethereum.Contracts
 open DETH2.Contracts.dEth.ContractDefinition
 open DETH2.Contracts.MCDSaverProxy.ContractDefinition;
-open DETH2.Contracts.VatLike.ContractDefinition
-open DETH2.Contracts.PipLike.ContractDefinition
-open DETH2.Contracts.IFlipper.ContractDefinition
-open DETH2.Contracts.ManagerLike.ContractDefinition
 
 type SpotterIlksOutputDTO = DETH2.Contracts.ISpotter.ContractDefinition.IlksOutputDTO
 type VatIlksOutputDTO = DETH2.Contracts.VatLike.ContractDefinition.IlksOutputDTO
@@ -56,8 +50,10 @@ let ``price is correct given source prices within ten percents of one another`` 
 
     let expected =
         if differencePercent <= 0.1M
-            then toMakerPriceFormatDecimal priceNonMakerDaiEth
-            else toMakerPriceFormatDecimal priceMaker
+        then 
+            toMakerPriceFormatDecimal priceNonMakerDaiEth
+        else 
+            toMakerPriceFormatDecimal priceMaker
 
     should equal expected price
 
@@ -114,9 +110,12 @@ let giveCDPToDSProxyTestBase shouldThrow =
     let newContract = getDEthContract ()
 
     let executeGiveCDPFromPrivateKey shouldThrow =
-        let ethConn = if shouldThrow 
-                            then (Debug(EthereumConnection(hardhatURI, hardhatPrivKey2)) :> IAsyncTxSender) 
-                            else ethConn :> IAsyncTxSender
+        let ethConn = 
+            if shouldThrow 
+            then 
+                (Debug(EthereumConnection(hardhatURI, hardhatPrivKey2)) :> IAsyncTxSender) 
+            else 
+                ethConn :> IAsyncTxSender
 
         let giveCDPToDSProxyReceipt = dEthContract.ExecuteFunctionFrom "giveCDPToDSProxy" [|newContract.Address|] ethConn
         giveCDPToDSProxyReceipt
@@ -146,7 +145,8 @@ let ``dEth - getCollateral - returns similar values as those directly retrieved 
     let contract = getDEthContract ()
 
     let getCollateralOutput = contract.QueryObj<GetCollateralOutputDTO> "getCollateral" [||]
-    let (_, priceRay, _, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral) = getManuallyComputedCollateralValues oracleContractMainnet saverProxy cdpId
+    let (_, priceRay, _, cdpDetailedInfoOutput, collateralDenominatedDebt, excessCollateral) = 
+        getManuallyComputedCollateralValues oracleContractMainnet saverProxy cdpId
     
     should equal priceRay getCollateralOutput.PriceRAY
     should equal cdpDetailedInfoOutput.Collateral getCollateralOutput.TotalCollateral
@@ -189,9 +189,12 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
     let price = saverProxyContract.Query<bigint> "getPrice" [|ilk|]
     let getCdpInfoOutputDTO = saverProxyContract.QueryObj<GetCdpInfoOutputDTO> "getCdpInfo" [|manager.Address;cdpId;ilk|]
 
-    let expected = if getCdpInfoOutputDTO.Debt = BigInteger.Zero 
-                            then BigInteger.Zero 
-                            else rdiv (wmul getCdpInfoOutputDTO.Collateral price) getCdpInfoOutputDTO.Debt
+    let expected = 
+        if getCdpInfoOutputDTO.Debt = BigInteger.Zero 
+        then 
+            BigInteger.Zero 
+        else 
+            rdiv (wmul getCdpInfoOutputDTO.Collateral price) getCdpInfoOutputDTO.Debt
 
     let actual = contract.Query<bigint> "getRatio" [||]
 
@@ -205,10 +208,15 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 let ``dEth - automate - an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
     restore ()
 
-    let automateTxr = AutomateFunction(RepaymentRatio = bigint repaymentRatioExpected, TargetRatio = bigint targetRatioExpected,
-                                BoostRatio = bigint boostRatioExpected, MinRedemptionRatio = bigint minRedemptionRatioExpected,
-                                AutomationFeePerc = bigint automationFeePercExpected, RiskLimit = bigint riskLimitExpected)
-                    |> ethConn.MakeImpersonatedCallWithNoEther (mapInlineDataArgumentToAddress addressArgument dEthContract.Address) dEthContract.Address
+    let automateTxr = 
+        AutomateFunction(
+            RepaymentRatio = bigint repaymentRatioExpected, 
+            TargetRatio = bigint targetRatioExpected,
+            BoostRatio = bigint boostRatioExpected, 
+            MinRedemptionRatio = bigint minRedemptionRatioExpected,
+            AutomationFeePerc = bigint automationFeePercExpected, 
+            RiskLimit = bigint riskLimitExpected)
+        |> ethConn.MakeImpersonatedCallWithNoEther (mapInlineDataArgumentToAddress addressArgument dEthContract.Address) dEthContract.Address
 
     automateTxr |> shouldSucceed
 
