@@ -213,7 +213,7 @@ let ``dEth - automate - an authorised address can change the automation settings
             RepaymentRatio = bigint repaymentRatioExpected, 
             TargetRatio = bigint targetRatioExpected,
             BoostRatio = bigint boostRatioExpected, 
-            MinRedemptionRatio = bigint minRedemptionRatioExpected,
+            MinRedemptionRatioPerc = bigint minRedemptionRatioExpected,
             AutomationFeePerc = bigint automationFeePercExpected, 
             RiskLimit = bigint riskLimitExpected)
         |> ethConn.MakeImpersonatedCallWithNoEther (mapInlineDataArgumentToAddress addressArgument dEthContract.Address) dEthContract.Address
@@ -228,7 +228,7 @@ let ``dEth - automate - an authorised address can change the automation settings
     event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
     event.TargetRatio |> should equal <| bigint targetRatioExpected
     event.BoostRatio |> should equal <| bigint boostRatioExpected
-    event.MinRedemptionRatio |> should equal <| bigint minRedemptionRatioExpected
+    event.MinRedemptionRatioPerc |> should equal <| bigint minRedemptionRatioExpected
     event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
     event.RiskLimit |> should equal <| bigint riskLimitExpected
 
