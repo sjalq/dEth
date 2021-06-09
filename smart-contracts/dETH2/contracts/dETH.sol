@@ -163,7 +163,7 @@ contract dEth is
         oracle = _oracle;
 
         // Initial values of automation variables
-        minRedemptionRatio = 160;
+        minRedemptionRatioPercPoints = 160;
         automationFeePerc = ONE_PERC; // 1.0%
         riskLimit = 1000*10**18;      // sets an initial limit of 1000 ETH that the contract will risk. 
 
@@ -267,8 +267,8 @@ contract dEth is
     {
         _protocolFee = _suppliedCollateral.mul(PROTOCOL_FEE_PERC).div(HUNDRED_PERC);
         _automationFee = _suppliedCollateral.mul(automationFeePerc).div(HUNDRED_PERC);
-        _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee); // _protocolFee goes to the protocol 
-        _accreditedCollateral = _actualCollateralAdded.sub(_automationFee); // _automationFee goes to the pool of funds in the cdp to offset gas implications
+        _actualCollateralAdded = _suppliedCollateral.sub(_protocolFee); 
+        _accreditedCollateral = _actualCollateralAdded.sub(_automationFee); 
         uint newTokenSupplyPerc = _accreditedCollateral.mul(HUNDRED_PERC).div(getExcessCollateral());
         _tokensIssued = totalSupply().mul(newTokenSupplyPerc).div(HUNDRED_PERC);
     }
@@ -282,13 +282,16 @@ contract dEth is
         uint _accreditedCollateral,
         uint _tokensIssued);
 
+    // Note: 
+    // This method should have been called issue(address _receiver), but will remain this for meme value
     function squanderMyEthForWorthlessBeans(address _receiver)
         payable
         public
     { 
         // Goals:
-        // 1. deposits eth into the vault 
-        // 2. gives the holder a claim on the vault for later withdrawal
+        // 1. deposit eth into the vault 
+        // 2. give the holder a claim on the vault for later withdrawal to the address they choose 
+        // 3. pay the protocol
 
         require(getExcessCollateral() < riskLimit.add(msg.value), "risk limit exceeded");
 
@@ -308,7 +311,9 @@ contract dEth is
         (bool protocolFeePaymentSuccess,) = gulper.call.value(protocolFee)("");
         require(protocolFeePaymentSuccess, "protocol fee transfer to gulper failed");
 
-        // note: the automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
+        // Note: 
+        // The automationFee is left in the CDP to cover the gas implications of leaving or joining dEth
+        // This is why it is not explicitly used in this method. 
 
         _mint(_receiver, tokensToIssue);
         
@@ -400,7 +405,7 @@ contract dEth is
             uint _repaymentRatio,
             uint _targetRatio,
             uint _boostRatio,
-            uint _minRedemptionRatio,
+            uint _minRedemptionRatioPercPoints,
             uint _automationFeePerc,
             uint _riskLimit);
 
@@ -411,7 +416,7 @@ contract dEth is
             uint _repaymentRatio,
             uint _targetRatio,
             uint _boostRatio,
-            uint _minRedemptionRatio,
+            uint _minRedemptionRatioPercPoints,
             uint _automationFeePerc,
             uint _riskLimit)
         public
@@ -432,7 +437,7 @@ contract dEth is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
-        minRedemptionRatio = _minRedemptionRatio;
+        minRedemptionRatioPercPoints = _minRedemptionRatioPercPoints;
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
 
@@ -452,7 +457,7 @@ contract dEth is
             _repaymentRatio,
             _targetRatio,
             _boostRatio,
-            minRedemptionRatio,
+            minRedemptionRatioPercPoints,
             automationFeePerc,
             riskLimit);
     }
