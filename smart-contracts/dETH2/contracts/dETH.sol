@@ -8,6 +8,15 @@ import "../../common.5/openzeppelin/token/ERC20/ERC20.sol";
 import "./DSMath.sol";
 import "./DSProxy.sol";
 
+// Number typing guide
+// The subsystems we use, use different decimal systems
+// Additionally we use different number assumptions for convenience
+// RAY -    10**27 - Maker decimal for high precision calculation
+// WAD -    10**18 - Maker decimal for token values
+// PERC -   10**16 - 1% of a with 100% == 1 WAD
+// CLP -    10**8  - Chainlink price format
+
+
 contract IDSGuard is DSAuthority
 {
     function permit(address src, address dst, bytes32 sig) public;
@@ -139,7 +148,7 @@ contract dEth is
     Oracle public oracle;
 
     // automation variables
-    uint public minRedemptionRatioPercPoints; // the min % excess collateral that must remain after any ETH redeem action
+    uint public minRedemptionRatioPerc; // the min % excess collateral that must remain after any ETH redeem action
     uint public automationFeePerc;  // the fee that goes to the collateral pool, on entry or exit, to compensate for potentially triggering a boost or redeem
     
     // riskLimit sets the maximum amount of excess collateral Eth the contract will place at risk
@@ -163,7 +172,7 @@ contract dEth is
         oracle = _oracle;
 
         // Initial values of automation variables
-        minRedemptionRatioPercPoints = 160;
+        minRedemptionRatioPerc = 160 * ONE_PERC;
         automationFeePerc = ONE_PERC; // 1.0%
         riskLimit = 1000*10**18;      // sets an initial limit of 1000 ETH that the contract will risk. 
 
@@ -249,10 +258,7 @@ contract dEth is
         view
         returns(uint _minRatio)
     {
-        // due to rdiv returning 10^9 less than one would intuitively expect, I've chosen to
-        // set minRedemptionRatioPercPoints to an integer value of discrete whole percentages for clarity 
-        // and rather just multiply it by 10^9 here so that it is on the same order as getRatio() when comparing the two.
-        _minRatio = rdiv(minRedemptionRatioPercPoints.mul(10**9), 100);
+        _minRatio = rdiv(minRedemptionRatioPerc.div(10**7), 100);
     }
 
     function calculateIssuanceAmount(uint _suppliedCollateral)
@@ -405,7 +411,7 @@ contract dEth is
             uint _repaymentRatio,
             uint _targetRatio,
             uint _boostRatio,
-            uint _minRedemptionRatioPercPoints,
+            uint _minRedemptionRatioPerc,
             uint _automationFeePerc,
             uint _riskLimit);
 
@@ -416,7 +422,7 @@ contract dEth is
             uint _repaymentRatio,
             uint _targetRatio,
             uint _boostRatio,
-            uint _minRedemptionRatioPercPoints,
+            uint _minRedemptionRatioPerc,
             uint _automationFeePerc,
             uint _riskLimit)
         public
@@ -437,7 +443,7 @@ contract dEth is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
-        minRedemptionRatioPercPoints = _minRedemptionRatioPercPoints;
+        minRedemptionRatioPerc = _minRedemptionRatioPerc;
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
 
@@ -457,7 +463,7 @@ contract dEth is
             _repaymentRatio,
             _targetRatio,
             _boostRatio,
-            minRedemptionRatioPercPoints,
+            minRedemptionRatioPerc,
             automationFeePerc,
             riskLimit);
     }
