@@ -1,6 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp5.0</TargetFramework>
+    <UserSecretsId>09390700-778b-4f05-997a-c9ef9aa7012a</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Remove="ContractDefinition\**" />
@@ -10,14 +11,33 @@
     <Compile Include="DTOs/DebugDefinition.fs" />
     <Compile Include="DTOs/TestTokenDefinition.fs" />
     <Compile Include="DTOs/BucketSaleDefinition.fs" />
+    <Compile Include="DTOs/DEthDefinition.fs" />
+    <Compile Include="DTOs/IMCDSaverProxyDefinition.fs" />
+    <Compile Include="DTOs/MCDSaverProxyDefinition.fs" />
+    <Compile Include="DTOs/SaverProxyActionsDefinition.fs" />
+    <Compile Include="DTOs/IMedianETHUSDDefinition.fs" />
+    <Compile Include="DTOs/IPriceFeedDefinition.fs" />
+    <Compile Include="DTOs/IMakerOracleAdvancedDefinition.fs" />
+    <Compile Include="DTOs/DSValueMockDefinition.fs" />
+    <Compile Include="DTOs/CatDefinition.fs" />
+    <Compile Include="DTOs/IMakerManagerAdvancedDefinition.fs" />
+    <Compile Include="DTOs/VatLikeDefinition.fs" />
+    <Compile Include="DTOs/ISpotterDefinition.fs" />
+    <Compile Include="DTOs/PipLikeDefinition.fs" />
+    <Compile Include="DTOs/IFlipperDefinition.fs" />
+    <Compile Include="DTOs/ManagerLikeDefinition.fs" />
     <Compile Include="Constants.fs" />
     <Compile Include="TestBase.fs" />
-    <Compile Include="BucketSaleTestBase.fs" />
-    <Compile Include="Tests.fs" />
-    <!-- <Compile Include="Program.fs" /> -->
+    <Compile Include="dEthTestsBase.fs" />
+    <Compile Include="dEthTests.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FsCheck" Version="2.15.1" />
+    <PackageReference Include="FsCheck.Xunit" Version="2.15.1" />
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="5.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
     <!--PackageReference Include="Nethereum.Web3" Version="5.0.101" /-->
     <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
@@ -27,5 +47,8 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit" Version="3.7.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Microsoft.Extensions.SecretManager.Tools" Version="2.0.0" />
   </ItemGroup>
 </Project>

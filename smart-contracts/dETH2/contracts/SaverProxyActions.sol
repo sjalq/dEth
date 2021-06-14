@@ -4,6 +4,8 @@
 
 pragma solidity ^0.5.0;
 
+import "./console.sol";
+
 contract GemLike {
     function approve(address, uint) public;
     function transfer(address, uint) public;

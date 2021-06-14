@@ -103,7 +103,6 @@ contract DSProxy is DSAuth, DSNote {
         returns (bytes32 response)
     {
         require(_target != address(0));
-
         
         assembly {
             let succeeded := delegatecall(
@@ -114,10 +113,10 @@ contract DSProxy is DSAuth, DSNote {
                 0,
                 32
             )
-            response := mload(0) 
+            response := mload(0)
             switch iszero(succeeded)
-                case 1 {
-                    
+                case 1 
+                {
                     revert(0, 0)
                 }
         }
