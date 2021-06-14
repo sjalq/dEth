@@ -13,7 +13,7 @@ import "./DSProxy.sol";
 // Additionally we use different number assumptions for convenience
 // RAY -    10**27 - Maker decimal for high precision calculation
 // WAD -    10**18 - Maker decimal for token values
-// PERC -   10**16 - 1% of a with 100% == 1 WAD
+// PERC -   10**16 - 1% of a WAD, with 100% == 1 WAD
 // CLP -    10**8  - Chainlink price format
 // RATIO -  10**32 - Ratio from Maker for a CDP's debt to GDP ratio. 
 
