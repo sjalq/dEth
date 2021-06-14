@@ -81,7 +81,7 @@ let ``initializes with correct values and rights assigned`` () =
     shouldEqualIgnoringCase oracleContractMainnet.Address (contract.Query<string> "oracle" [||])
     should equal true canCall
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
-    dEthContract.Query<bigint> "minRedemptionRatioPerc" [||] |> should equal <| (bigint 160) * ratio
+    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal <| (bigint 160) * ratio
 
 
 [<Specification("dEth", "changeGulper", 0)>]
@@ -215,14 +215,14 @@ let ``dEth - automate - an authorised address can change the automation settings
             RepaymentRatio = bigint repaymentRatioExpected, 
             TargetRatio = bigint targetRatioExpected,
             BoostRatio = bigint boostRatioExpected, 
-            MinRedemptionRatioPerc = bigint minRedemptionRatioExpected,
+            MinRedemptionRatio = bigint minRedemptionRatioExpected,
             AutomationFeePerc = bigint automationFeePercExpected, 
             RiskLimit = bigint riskLimitExpected)
         |> ethConn.MakeImpersonatedCallWithNoEther (mapInlineDataArgumentToAddress addressArgument dEthContract.Address) dEthContract.Address
 
     automateTxr |> shouldSucceed
 
-    dEthContract.Query<bigint> "minRedemptionRatioPerc" [||] |> should equal <| (bigint minRedemptionRatioExpected) * ratio
+    dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal <| (bigint minRedemptionRatioExpected) * ratio
     dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal (bigint automationFeePercExpected)
     dEthContract.Query<bigint> "riskLimit" [||] |> should equal (bigint riskLimitExpected)
 
@@ -230,7 +230,7 @@ let ``dEth - automate - an authorised address can change the automation settings
     event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
     event.TargetRatio |> should equal <| bigint targetRatioExpected
     event.BoostRatio |> should equal <| bigint boostRatioExpected
-    event.MinRedemptionRatioPerc |> should equal <| (bigint minRedemptionRatioExpected) * ratio
+    event.MinRedemptionRatio |> should equal <| (bigint minRedemptionRatioExpected) * ratio
     event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
     event.RiskLimit |> should equal <| bigint riskLimitExpected
 

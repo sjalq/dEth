@@ -52,8 +52,8 @@ open System.Threading
             member val TargetRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_boostRatio", 3, false )>]
             member val BoostRatio = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "_minRedemptionRatioPerc", 4, false )>]
-            member val MinRedemptionRatioPerc = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "_minRedemptionRatio", 4, false )>]
+            member val MinRedemptionRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_automationFeePerc", 5, false )>]
             member val AutomationFeePerc = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_riskLimit", 6, false )>]
@@ -276,7 +276,7 @@ open System.Threading
         
     
     [<FunctionOutput>]
-    type MinRedemptionRatioPercOutputDTO() =
+    type MinRedemptionRatioOutputDTO() =
         inherit FunctionOutputDTO() 
             [<Parameter("uint256", "", 1)>]
             member val public ReturnValue1 = Unchecked.defaultof<BigInteger> with get, set
@@ -376,8 +376,8 @@ open System.Threading
             member val public TargetRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_boostRatio", 3)>]
             member val public BoostRatio = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "_minRedemptionRatioPerc", 4)>]
-            member val public MinRedemptionRatioPerc = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "_minRedemptionRatio", 4)>]
+            member val public MinRedemptionRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_automationFeePerc", 5)>]
             member val public AutomationFeePerc = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_riskLimit", 6)>]
@@ -572,8 +572,8 @@ open System.Threading
 
         
     
-    [<Function("minRedemptionRatioPerc", "uint256")>]
-    type MinRedemptionRatioPercFunction() = 
+    [<Function("minRedemptionRatio", "uint256")>]
+    type MinRedemptionRatioFunction() = 
         inherit FunctionMessage()
     
 

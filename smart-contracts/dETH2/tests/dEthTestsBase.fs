@@ -209,7 +209,7 @@ let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
         [|repaymentRatio; 
         targetRatio; 
         boostRatio; 
-        (dEthQuery "minRedemptionRatioPerc") / ratio; 
+        (dEthQuery "minRedemptionRatio") / ratio; 
         dEthQuery "automationFeePerc"; 
         riskLimit|]
 
