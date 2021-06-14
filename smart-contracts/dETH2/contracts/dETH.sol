@@ -15,7 +15,7 @@ import "./DSProxy.sol";
 // WAD -    10**18 - Maker decimal for token values
 // PERC -   10**16 - 1% of a with 100% == 1 WAD
 // CLP -    10**8  - Chainlink price format
-
+// RATIO -  10**32 - Ratio from Maker for a CDP's debt to GDP ratio. 
 
 contract IDSGuard is DSAuthority
 {
@@ -148,7 +148,7 @@ contract dEth is
     Oracle public oracle;
 
     // automation variables
-    uint public minRedemptionRatioPerc; // the min % excess collateral that must remain after any ETH redeem action
+    uint public minRedemptionRatio; // the min % excess collateral that must remain after any ETH redeem action
     uint public automationFeePerc;  // the fee that goes to the collateral pool, on entry or exit, to compensate for potentially triggering a boost or redeem
     
     // riskLimit sets the maximum amount of excess collateral Eth the contract will place at risk
@@ -172,7 +172,7 @@ contract dEth is
         oracle = _oracle;
 
         // Initial values of automation variables
-        minRedemptionRatioPerc = 160 * ONE_PERC;
+        minRedemptionRatio = uint(160).mul(ONE_PERC).mul(10**18);
         automationFeePerc = ONE_PERC; // 1.0%
         riskLimit = 1000*10**18;      // sets an initial limit of 1000 ETH that the contract will risk. 
 
@@ -251,14 +251,6 @@ contract dEth is
     {
         (,,,bytes32 ilk) = IMCDSaverProxy(saverProxy).getCdpDetailedInfo(cdpId);
         _ratio = IMCDSaverProxy(saverProxy).getRatio(cdpId, ilk);
-    }
-
-    function getMinRedemptionRatio()
-        public
-        view
-        returns(uint _minRatio)
-    {
-        _minRatio = rdiv(minRedemptionRatioPerc.div(10**7), 100);
     }
 
     function calculateIssuanceAmount(uint _suppliedCollateral)
@@ -395,7 +387,7 @@ contract dEth is
 
         // this ensures that the CDP will be boostable by DefiSaver before it can be bitten
         // to prevent bites, getRatio() doesn't use oracle but the price set in the MakerCDP system 
-        require(getRatio() >= getMinRedemptionRatio(), "cannot violate collateral safety ratio");
+        require(getRatio() >= minRedemptionRatio, "cannot violate collateral safety ratio");
 
         emit Redeemed(  
             msg.sender,
@@ -411,7 +403,7 @@ contract dEth is
             uint _repaymentRatio,
             uint _targetRatio,
             uint _boostRatio,
-            uint _minRedemptionRatioPerc,
+            uint _minRedemptionRatio,
             uint _automationFeePerc,
             uint _riskLimit);
 
@@ -422,7 +414,7 @@ contract dEth is
             uint _repaymentRatio,
             uint _targetRatio,
             uint _boostRatio,
-            uint _minRedemptionRatioPerc,
+            uint _minRedemptionRatio,
             uint _automationFeePerc,
             uint _riskLimit)
         public
@@ -443,17 +435,17 @@ contract dEth is
         address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
         address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
 
-        minRedemptionRatioPerc = _minRedemptionRatioPerc * ONE_PERC;
+        minRedemptionRatio = _minRedemptionRatio.mul(ONE_PERC).mul(10**18);
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
 
         bytes memory subscribeProxyCall = abi.encodeWithSignature(
             "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
             cdpId, 
-            _repaymentRatio * 10**16, 
-            _boostRatio * 10**16,
-            _targetRatio * 10**16,
-            _targetRatio * 10**16,
+            _repaymentRatio.mul(ONE_PERC), 
+            _boostRatio.mul(ONE_PERC),
+            _targetRatio.mul(ONE_PERC),
+            _targetRatio.mul(ONE_PERC),
             true,
             true,
             subscriptions);
@@ -463,7 +455,7 @@ contract dEth is
             _repaymentRatio,
             _targetRatio,
             _boostRatio,
-            minRedemptionRatioPerc,
+            minRedemptionRatio,
             automationFeePerc,
             riskLimit);
     }

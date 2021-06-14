@@ -81,6 +81,8 @@ let ``initializes with correct values and rights assigned`` () =
     shouldEqualIgnoringCase oracleContractMainnet.Address (contract.Query<string> "oracle" [||])
     should equal true canCall
     should greaterThan BigInteger.Zero balanceOfInitialRecipient
+    dEthContract.Query<bigint> "minRedemptionRatioPerc" [||] |> should equal <| (bigint 160) * ratio
+
 
 [<Specification("dEth", "changeGulper", 0)>]
 [<Fact>]
@@ -220,7 +222,7 @@ let ``dEth - automate - an authorised address can change the automation settings
 
     automateTxr |> shouldSucceed
 
-    dEthContract.Query<bigint> "minRedemptionRatioPerc" [||] |> should equal (bigint minRedemptionRatioExpected)
+    dEthContract.Query<bigint> "minRedemptionRatioPerc" [||] |> should equal <| (bigint minRedemptionRatioExpected) * ratio
     dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal (bigint automationFeePercExpected)
     dEthContract.Query<bigint> "riskLimit" [||] |> should equal (bigint riskLimitExpected)
 
@@ -228,7 +230,7 @@ let ``dEth - automate - an authorised address can change the automation settings
     event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
     event.TargetRatio |> should equal <| bigint targetRatioExpected
     event.BoostRatio |> should equal <| bigint boostRatioExpected
-    event.MinRedemptionRatioPerc |> should equal <| bigint minRedemptionRatioExpected
+    event.MinRedemptionRatioPerc |> should equal <| (bigint minRedemptionRatioExpected) * ratio
     event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
     event.RiskLimit |> should equal <| bigint riskLimitExpected
 
@@ -252,7 +254,7 @@ let ``dEth - automate - an unauthorised address cannot change the automation set
 [<InlineData(0.001, 0.0005, false)>]
 [<InlineData(10.0, 7.0, true)>]
 [<InlineData(1.0, 0.05, true)>]
-let ``dEth - redeem - someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensToMint:float) (tokensToRedeem:float) (riskLevelShouldBeExceeded:bool) =
+let ``blah dEth - redeem - someone with a positive balance of dEth can redeem the expected amount of Ether`` (tokensToMint:float) (tokensToRedeem:float) (riskLevelShouldBeExceeded:bool) =
     restore ()
 
     let redeemerConnection = EthereumConnection(hardhatURI, hardhatPrivKey2)

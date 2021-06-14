@@ -15,6 +15,8 @@ module Array =
 
 let protocolFeePercent = bigint 9 * BigInteger.Pow(bigint 10, 15)
 let hundredPerc = BigInteger.Pow(bigint 10, 18)
+let onePerc = BigInteger.Pow(bigint 10, 16)
+let ratio = BigInteger.Pow(bigint 10, 34)
 
 let RAY = BigInteger.Pow(bigint 10, 27);
 let rdiv x y = (x * RAY + y / bigint 2) / y;
@@ -201,10 +203,15 @@ let queryStateAndCalculateIssuanceAmount (dEthContract:ContractPlug) weiValue =
 let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
     let dEthQuery name = dEthContract.Query<bigint> name [||]
     let excessCollateral = dEthQuery "getExcessCollateral"
-
     let ratioBetweenRiskLimitAndExcessCollateral = 0.9M // hardcoded to be less than one - so that risk limit is less than excess collateral
     let riskLimit = toBigDecimal excessCollateral * BigDecimal(ratioBetweenRiskLimitAndExcessCollateral) |> toBigInt
-    dEthContract.ExecuteFunction "automate" [|repaymentRatio; targetRatio; boostRatio; dEthQuery "minRedemptionRatioPerc"; dEthQuery "automationFeePerc"; riskLimit|]
+    dEthContract.ExecuteFunction "automate" 
+        [|repaymentRatio; 
+        targetRatio; 
+        boostRatio; 
+        (dEthQuery "minRedemptionRatioPerc") / ratio; 
+        dEthQuery "automationFeePerc"; 
+        riskLimit|]
 
 // note: this is used to be able to specify owner and contract addresses in inlinedata (we cannot use DUs in attributes)
 let mapInlineDataArgumentToAddress inlineDataArgument calledContractAddress =
