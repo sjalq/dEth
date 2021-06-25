@@ -120,6 +120,15 @@ contract Oracle
     }
 }
 
+// Note: What is not aparent explicitly in this contract is how calls to the "auth" methods are to
+// be dealt with. All auth methods will initially be owned by the owner key of this contract. 
+// The intent is to keep it under the control of the owner key until some history of use can be
+// built up to increase confidence that the contract is indeed safe and stable in the wild.
+// Thereafter the owner key will be given to an OpenZeppelin TimelockController contract with a
+// 48 hour delay. The TimelockController in turn will be owned by the FoundryDAO and controlled
+// via it's governance structures. This will give any participants 48 hours to take action, should
+// any change be unpalatable. 
+
 contract dEth is 
     ERC20Detailed, 
     ERC20,
@@ -185,14 +194,14 @@ contract dEth is
         guard.permit(
             _automationAuthority,
             address(this),
-            bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)")));
+            bytes4(keccak256("changeSettings(uint256,uint256,uint256)")));
         setAuthority(guard);
 
         require(
             authority.canCall(
                 _automationAuthority, 
                 address(this), 
-                bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)"))),
+                bytes4(keccak256("changeSettings(uint256,uint256,uint256)"))),
             "guard setting failed");
     }
 
@@ -399,64 +408,31 @@ contract dEth is
             collateralToReturn);
     }
     
-    event AutomationSettingsChanged(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
+    event SettingsChanged(
             uint _minRedemptionRatio,
             uint _automationFeePerc,
             uint _riskLimit);
 
-    // note: all values used by defisaver are in WAD format
-    // we do not need that level of precision on this method
-    // so for simplicity and readability they are all set in discrete percentages here
-    function automate(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
+    function changeSettings(
             uint _minRedemptionRatio,
             uint _automationFeePerc,
             uint _riskLimit)
         public
         auth
     {
-        // for reference - this function is called on the subscriptionsProxyV2: 
-        // function subscribe(
-        //     uint _cdpId, 
-        //     uint128 _minRatio, 
-        //     uint128 _maxRatio, 
-        //     uint128 _optimalRatioBoost, 
-        //     uint128 _optimalRatioRepay, 
-        //     bool _boostEnabled, 
-        //     bool _nextPriceEnabled, 
-        //     address _subscriptions) 
-
-        // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
-        address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
-        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
-
         minRedemptionRatio = _minRedemptionRatio.mul(ONE_PERC).mul(10**18);
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
 
-        bytes memory subscribeProxyCall = abi.encodeWithSignature(
-            "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
-            cdpId, 
-            _repaymentRatio.mul(ONE_PERC), 
-            _boostRatio.mul(ONE_PERC),
-            _targetRatio.mul(ONE_PERC),
-            _targetRatio.mul(ONE_PERC),
-            true,
-            true,
-            subscriptions);
-        IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
-        
-        emit AutomationSettingsChanged(
-            _repaymentRatio,
-            _targetRatio,
-            _boostRatio,
+        emit SettingsChanged(
             minRedemptionRatio,
             automationFeePerc,
             riskLimit);
     }
+
+    // Note: since defisaver automation can be upgraded and since older versions of their subscription 
+    // contract is not guarenteed to be updated by their offchain service and since the calling of the
+    // automation script involves passing in a custom contract to where a delgate call is made; it is
+    // saver to rather execute the automation script once the CDP has been handed over from the previous
+    // version of dEth to this version, via an execute(_address, _data) call.
 }
