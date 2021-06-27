@@ -13,7 +13,7 @@ import "./DSProxy.sol";
 // Additionally we use different number assumptions for convenience
 // RAY -    10**27 - Maker decimal for high precision calculation
 // WAD -    10**18 - Maker decimal for token values
-// PERC -   10**16 - 1% of a with 100% == 1 WAD
+// PERC -   10**16 - 1% of a WAD, with 100% == 1 WAD
 // CLP -    10**8  - Chainlink price format
 // RATIO -  10**32 - Ratio from Maker for a CDP's debt to GDP ratio. 
 
@@ -120,6 +120,56 @@ contract Oracle
     }
 }
 
+// Description:
+// This contract tokenizes ownership of a Maker CDP. It does so by allowing anyone to mint new
+// tokens in exchange for collateral and issues tokens in proportion to the excess collateral
+// that is already in the CDP. It also allows anyone with dEth tokens to redeem these tokens
+// in exchange for the excess collateral in the CDP, proportional to their share of total dEth
+// tokens.
+// Furthermore the contract inherits from DSProxy which allows its CDP to be automated via the 
+// DeFiSaver ecosystem. This automation is activated by calling the subscribe() method on the
+// DeFiSaver SubscriptionsProxyV2 contract via the execute() method inherited from DSProxy.
+// This automation will automatically increase the leverage of the CDP to a target ratio if the
+// collateral increases in value and automatically decrease it to the target ratio if the 
+// collateral falls in value. 
+// SubscriptionsProxyV2 can be viewed here:
+// https://etherscan.io/address/0xB78EbeD358Eb5a94Deb08Dc97846002F0632c99A#code
+// An audit of the DeFiSaver system can be viewed here:
+// https://github.com/DecenterApps/defisaver-contracts/blob/master/audits/Dedaub%20-%20DeFi%20Saver%20Automation%20Audit%20-%20February%202021.pdf
+
+// When activate the automation makes the dEth contract a perpetually levered long position on
+// the price of Ether in US dollars. 
+
+// Details:
+// The contract charges a protocol fee that is paid out to contract called the gulper. The fee
+// is fixed at 0.9%. 
+// Due to the sometimes extreme gas fees required to run the DefiSaver automations, an 
+// additional automation fee is charged to anyone entering or exiting the system. This fee can 
+// be increased or decreased as needed to compensate existing participants.
+// There is a riskLimit parameter that prevents the system from acquiring too much collateral 
+// before it has established a record of safety. This can also be used to prevent new 
+// participants from minting new dEth in case an upgrade is necessary and dEth tokens need to 
+// be migrated to a new version.
+// The minRedemptionRatio parameter prevents too much collateral being removed at once from
+// the CDP before DefiSaver has the opportunity to return the CDP to its target parameters. 
+
+// Note: 
+// What is not apparent explicitly in this contract is how calls to the "auth" methods are to
+// be dealt with. All auth methods will initially be owned by the owner key of this contract. 
+// The intent is to keep it under the control of the owner key until some history of use can be
+// built up to increase confidence that the contract is indeed safe and stable in the wild.
+// Thereafter the owner key will be given to an OpenZeppelin TimelockController contract with a
+// 48 hour delay. The TimelockController in turn will be owned by the FoundryDAO and controlled
+// via it's governance structures. This will give any participants at least 48 hours to take 
+// action, should any change be unpalatable. 
+
+// Note: 
+// Since defisaver automation can be upgraded and since older versions of their subscription 
+// contract are not guarenteed to be updated by their offchain services and since the calling 
+// of the automation script involves passing in a custom contract to where a delgate call is
+// made; it is safer to rather execute the automation script via an execute(_address, _data) 
+// call inherited from DSProxy through the auth system.
+
 contract dEth is 
     ERC20Detailed, 
     ERC20,
@@ -127,6 +177,8 @@ contract dEth is
     DSProxy
 {
     using SafeMath for uint;
+
+    string constant terms = "By interacting with this contract, you agree to be bound by the terms of service found at https://www.FoundryDao.com/dEthTerms/";
 
     uint constant ONE_PERC = 10**16;                    //   1.0% 
     uint constant HUNDRED_PERC = 10**18;                // 100.0%
@@ -151,6 +203,7 @@ contract dEth is
     uint public minRedemptionRatio; // the min % excess collateral that must remain after any ETH redeem action
     uint public automationFeePerc;  // the fee that goes to the collateral pool, on entry or exit, to compensate for potentially triggering a boost or redeem
     
+    // Note:
     // riskLimit sets the maximum amount of excess collateral Eth the contract will place at risk
     // When exceeded it is no longer possible to issue dEth via the squander function
     // This can also be used to retire the contract by setting it to 0
@@ -185,14 +238,14 @@ contract dEth is
         guard.permit(
             _automationAuthority,
             address(this),
-            bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)")));
+            bytes4(keccak256("changeSettings(uint256,uint256,uint256)")));
         setAuthority(guard);
 
         require(
             authority.canCall(
                 _automationAuthority, 
                 address(this), 
-                bytes4(keccak256("automate(uint256,uint256,uint256,uint256,uint256,uint256)"))),
+                bytes4(keccak256("changeSettings(uint256,uint256,uint256)"))),
             "guard setting failed");
     }
 
@@ -282,7 +335,7 @@ contract dEth is
 
     // Note: 
     // This method should have been called issue(address _receiver), but will remain this for meme value
-    function squanderMyEthForWorthlessBeans(address _receiver)
+    function squanderMyEthForWorthlessBeansAndAgreeToTerms(address _receiver)
         payable
         public
     { 
@@ -399,62 +452,23 @@ contract dEth is
             collateralToReturn);
     }
     
-    event AutomationSettingsChanged(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
+    event SettingsChanged(
             uint _minRedemptionRatio,
             uint _automationFeePerc,
             uint _riskLimit);
 
-    // note: all values used by defisaver are in WAD format
-    // we do not need that level of precision on this method
-    // so for simplicity and readability they are all set in discrete percentages here
-    function automate(
-            uint _repaymentRatio,
-            uint _targetRatio,
-            uint _boostRatio,
+    function changeSettings(
             uint _minRedemptionRatio,
             uint _automationFeePerc,
             uint _riskLimit)
         public
         auth
     {
-        // for reference - this function is called on the subscriptionsProxyV2: 
-        // function subscribe(
-        //     uint _cdpId, 
-        //     uint128 _minRatio, 
-        //     uint128 _maxRatio, 
-        //     uint128 _optimalRatioBoost, 
-        //     uint128 _optimalRatioRepay, 
-        //     bool _boostEnabled, 
-        //     bool _nextPriceEnabled, 
-        //     address _subscriptions) 
-
-        // since it's unclear if there's an official version of this on Kovan, this is hardcoded for mainnet
-        address subscriptionsProxyV2 = 0xd6f2125bF7FE2bc793dE7685EA7DEd8bff3917DD;
-        address subscriptions = 0xC45d4f6B6bf41b6EdAA58B01c4298B8d9078269a; 
-
         minRedemptionRatio = _minRedemptionRatio.mul(ONE_PERC).mul(10**18);
         automationFeePerc = _automationFeePerc;
         riskLimit = _riskLimit;
 
-        bytes memory subscribeProxyCall = abi.encodeWithSignature(
-            "subscribe(uint256,uint128,uint128,uint128,uint128,bool,bool,address)",
-            cdpId, 
-            _repaymentRatio.mul(ONE_PERC), 
-            _boostRatio.mul(ONE_PERC),
-            _targetRatio.mul(ONE_PERC),
-            _targetRatio.mul(ONE_PERC),
-            true,
-            true,
-            subscriptions);
-        IDSProxy(address(this)).execute(subscriptionsProxyV2, subscribeProxyCall);
-        
-        emit AutomationSettingsChanged(
-            _repaymentRatio,
-            _targetRatio,
-            _boostRatio,
+        emit SettingsChanged(
             minRedemptionRatio,
             automationFeePerc,
             riskLimit);

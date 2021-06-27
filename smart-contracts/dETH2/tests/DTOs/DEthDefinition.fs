@@ -43,14 +43,9 @@ open System.Threading
             member val Value = Unchecked.defaultof<BigInteger> with get, set
         
     
-    [<Event("AutomationSettingsChanged")>]
-    type AutomationSettingsChangedEventDTO() =
+    [<Event("SettingsChanged")>]
+    type SettingsChangedEventDTO() =
         inherit EventDTO()
-            [<Parameter("uint256", "_repaymentRatio", 1, false )>]
-            member val RepaymentRatio = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "_targetRatio", 2, false )>]
-            member val TargetRatio = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "_boostRatio", 3, false )>]
             member val BoostRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_minRedemptionRatio", 4, false )>]
             member val MinRedemptionRatio = Unchecked.defaultof<BigInteger> with get, set
@@ -366,16 +361,10 @@ open System.Threading
 
         
     
-    [<Function("automate")>]
-    type AutomateFunction() = 
+    [<Function("changeSettings")>]
+    type ChangeSettings() = 
         inherit FunctionMessage()
     
-            [<Parameter("uint256", "_repaymentRatio", 1)>]
-            member val public RepaymentRatio = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "_targetRatio", 2)>]
-            member val public TargetRatio = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "_boostRatio", 3)>]
-            member val public BoostRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_minRedemptionRatio", 4)>]
             member val public MinRedemptionRatio = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "_automationFeePerc", 5)>]
@@ -655,8 +644,8 @@ open System.Threading
             member val public Owner_ = Unchecked.defaultof<string> with get, set
         
     
-    [<Function("squanderMyEthForWorthlessBeans")>]
-    type SquanderMyEthForWorthlessBeansFunction() = 
+    [<Function("squanderMyEthForWorthlessBeansAndAgreeToTerms")>]
+    type SquanderMyEthForWorthlessBeansAndAgreeToTermsFunction() = 
         inherit FunctionMessage()
     
             [<Parameter("address", "_receiver", 1)>]

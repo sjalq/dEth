@@ -65,7 +65,7 @@ let ``initializes with correct values and rights assigned`` () =
     let authority, contract = getDEthContractAndAuthority()
 
     // check the rights
-    let functionName = Web3.Sha3("automate(uint256,uint256,uint256,uint256,uint256,uint256)").Substring(0, 8).HexToByteArray()
+    let functionName = Web3.Sha3("changeSettings(uint256,uint256,uint256)").Substring(0, 8).HexToByteArray()
     let canCall = authority.Query<bool> "canCall" [|foundryTreasury; contract.Address; functionName |]
 
     // check the balance of initialRecipient
@@ -202,46 +202,40 @@ let ``dEth - getRatio - returns similar values as those directly retrieved from 
 
     should equal expected actual
 
-[<Specification("dEth", "automate", 0)>]
+[<Specification("dEth", "changeSettings", 0)>]
 [<Theory>]
 [<InlineData(foundryTreasury, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(ownerArg, 180, 220, 220, 1, 1, 1)>]
 [<InlineData(contractArg, 180, 220, 220, 1, 1, 1)>]
-let ``dEth - automate - an authorised address can change the automation settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
+let ``dEth - changeSettings - an authorised address can change the settings`` (addressArgument:string) (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) =
     restore ()
 
-    let automateTxr = 
-        AutomateFunction(
-            RepaymentRatio = bigint repaymentRatioExpected, 
-            TargetRatio = bigint targetRatioExpected,
-            BoostRatio = bigint boostRatioExpected, 
+    let changeSettingsTxr = 
+        ChangeSettings(
             MinRedemptionRatio = bigint minRedemptionRatioExpected,
             AutomationFeePerc = bigint automationFeePercExpected, 
             RiskLimit = bigint riskLimitExpected)
         |> ethConn.MakeImpersonatedCallWithNoEther (mapInlineDataArgumentToAddress addressArgument dEthContract.Address) dEthContract.Address
 
-    automateTxr |> shouldSucceed
+    changeSettingsTxr |> shouldSucceed
 
     dEthContract.Query<bigint> "minRedemptionRatio" [||] |> should equal <| (bigint minRedemptionRatioExpected) * ratio
     dEthContract.Query<bigint> "automationFeePerc" [||] |> should equal (bigint automationFeePercExpected)
     dEthContract.Query<bigint> "riskLimit" [||] |> should equal (bigint riskLimitExpected)
 
-    let event = automateTxr.DecodeAllEvents<AutomationSettingsChangedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
-    event.RepaymentRatio |> should equal <| bigint repaymentRatioExpected
-    event.TargetRatio |> should equal <| bigint targetRatioExpected
-    event.BoostRatio |> should equal <| bigint boostRatioExpected
+    let event = changeSettingsTxr.DecodeAllEvents<SettingsChangedEventDTO>() |> Seq.map (fun i -> i.Event) |> Seq.head
     event.MinRedemptionRatio |> should equal <| (bigint minRedemptionRatioExpected) * ratio
     event.AutomationFeePerc |> should equal <| bigint automationFeePercExpected
     event.RiskLimit |> should equal <| bigint riskLimitExpected
 
-[<Specification("dEth", "automate", 1)>]
+[<Specification("dEth", "changeSettings", 1)>]
 [<Theory>]
 [<InlineData(repaymentRatio, targetRatio, boostRatio, 1, 1, 1)>]
-let ``dEth - automate - an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
+let ``dEth - changeSettings - an unauthorised address cannot change the automation settings`` (repaymentRatioExpected:int) (targetRatioExpected:int) (boostRatioExpected:int) (minRedemptionRatioExpected:int) (automationFeePercExpected:int) (riskLimitExpected:int) = 
     restore ()
 
     Debug <| EthereumConnection(hardhatURI, makeAccountWithBalance().PrivateKey)
-    |> dEthContract.ExecuteFunctionFrom "automate" [|repaymentRatioExpected;targetRatioExpected;boostRatioExpected;minRedemptionRatioExpected;automationFeePercExpected;riskLimitExpected|]
+    |> dEthContract.ExecuteFunctionFrom "changeSettings" [|minRedemptionRatioExpected;automationFeePercExpected;riskLimitExpected|]
     |> debug.DecodeForwardedEvents
     |> Seq.head
     |> shouldRevertWithUnknownMessage // To clarify : We get no message because the auth code reverts without providing one
@@ -307,7 +301,7 @@ let ``dEth - redeem - someone without a balance can never redeem Ether`` tokensA
     |> Seq.head
     |> shouldRevertWithMessage "ERC20: burn amount exceeds balance"
 
-[<Specification("dEth", "squanderMyEthForWorthlessBeans", 1)>]
+[<Specification("dEth", "squanderMyEthForWorthlessBeansAndAgreeToTerms", 1)>]
 [<Theory>]
 [<InlineData(100.0)>]
 [<InlineData(10.0)>]
@@ -316,7 +310,7 @@ let ``dEth - redeem - someone without a balance can never redeem Ether`` tokensA
 [<InlineData(0.001)>]
 [<InlineData(0.0001)>]
 [<InlineData(0.0)>] // a test case checking that no-one providing no ether can issue themselves any deth
-let ``dEth - squanderMyEthForWorthlessBeans - anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
+let ``dEth - squanderMyEthForWorthlessBeansAndAgreeToTerms - anyone providing a positive balance of Ether can issue themselves the expected amount of dEth`` (providedCollateral:float) =
     restore ()
 
     let providedCollateralBigInt = bigint providedCollateral
@@ -333,7 +327,7 @@ let ``dEth - squanderMyEthForWorthlessBeans - anyone providing a positive balanc
     let dEthRecipientAddress = ethConn.Account.Address
     let balanceBefore = balanceOf dEthContract dEthRecipientAddress
 
-    let squanderTxr = dEthContract.ExecuteFunctionFromAsyncWithValue providedCollateralBigInt "squanderMyEthForWorthlessBeans" [|dEthRecipientAddress|] ethConn |> runNow
+    let squanderTxr = dEthContract.ExecuteFunctionFromAsyncWithValue providedCollateralBigInt "squanderMyEthForWorthlessBeansAndAgreeToTerms" [|dEthRecipientAddress|] ethConn |> runNow
     squanderTxr |> shouldSucceed
 
     balanceOf dEthContract dEthRecipientAddress |> should equal (balanceBefore + tokensIssuedExpected)
@@ -350,15 +344,15 @@ let ``dEth - squanderMyEthForWorthlessBeans - anyone providing a positive balanc
     issuedEvent.AccreditedCollateral |> should equal accreditedCollateralExpected
     issuedEvent.TokensIssued |> should equal tokensIssuedExpected
 
-[<Specification("dEth", "squanderMyEthForWorthlessBeans", 2)>]
+[<Specification("dEth", "squanderMyEthForWorthlessBeansAndAgreeToTerms", 2)>]
 [<Fact>]
-let ``dEth - squanderMyEthForWorthlessBeans - the riskLevel cannot be exceeded`` () =
+let ``dEth - squanderMyEthForWorthlessBeansAndAgreeToTerms - the riskLevel cannot be exceeded`` () =
     restore ()
 
     makeRiskLimitLessThanExcessCollateral dEthContract |> shouldSucceed
 
     debug
-    |> dEthContract.ExecuteFunctionFrom "squanderMyEthForWorthlessBeans" [|makeAccount().Address|]
+    |> dEthContract.ExecuteFunctionFrom "squanderMyEthForWorthlessBeansAndAgreeToTerms" [|makeAccount().Address|]
     |> debug.DecodeForwardedEvents
     |> Seq.head
     |> shouldRevertWithMessage "risk limit exceeded"

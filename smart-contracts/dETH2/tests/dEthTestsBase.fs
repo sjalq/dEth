@@ -205,11 +205,8 @@ let makeRiskLimitLessThanExcessCollateral (dEthContract:ContractPlug) =
     let excessCollateral = dEthQuery "getExcessCollateral"
     let ratioBetweenRiskLimitAndExcessCollateral = 0.9M // hardcoded to be less than one - so that risk limit is less than excess collateral
     let riskLimit = toBigDecimal excessCollateral * BigDecimal(ratioBetweenRiskLimitAndExcessCollateral) |> toBigInt
-    dEthContract.ExecuteFunction "automate" 
-        [|repaymentRatio; 
-        targetRatio; 
-        boostRatio; 
-        (dEthQuery "minRedemptionRatio") / ratio; 
+    dEthContract.ExecuteFunction "changeSettings" 
+        [|(dEthQuery "minRedemptionRatio") / ratio; 
         dEthQuery "automationFeePerc"; 
         riskLimit|]
 
